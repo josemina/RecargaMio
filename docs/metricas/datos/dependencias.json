@@ -1,0 +1,66 @@
+{
+  "generadoEn": "2026-11-18T23:35:43.374Z",
+  "todas": {
+    "info": 0,
+    "low": 0,
+    "moderate": 30,
+    "high": 3,
+    "critical": 0,
+    "total": 33
+  },
+  "produccion": {
+    "info": 0,
+    "low": 0,
+    "moderate": 28,
+    "high": 3,
+    "critical": 0,
+    "total": 31
+  },
+  "dependencias": {
+    "prod": 936,
+    "dev": 475,
+    "optional": 154,
+    "peer": 56,
+    "peerOptional": 0,
+    "total": 1518
+  },
+  "graves": [
+    {
+      "paquete": "@prisma/config",
+      "severidad": "high",
+      "directa": false,
+      "avisos": [],
+      "origen": [
+        "deepmerge-ts"
+      ],
+      "correccion": "prisma@7.10.1 (cambio mayor)",
+      "justificacion": "Llega con prisma: carga la configuración de Prisma desde el repositorio al migrar. Misma justificación que prisma."
+    },
+    {
+      "paquete": "deepmerge-ts",
+      "severidad": "high",
+      "directa": false,
+      "avisos": [
+        {
+          "titulo": "DeepmergeTS has stack exhaustion when merging recursive object graphs",
+          "rango": "<8.0.0",
+          "url": "https://github.com/advisories/GHSA-ggr8-5vv4-36mx"
+        }
+      ],
+      "origen": [],
+      "correccion": "prisma@7.10.1 (cambio mayor)",
+      "justificacion": "Agotamiento de pila al combinar objetos con referencias circulares (GHSA-ggr8-5vv4-36mx). Solo lo usa @prisma/config con la configuración del repositorio, nunca con datos que envía un usuario. Misma justificación que prisma."
+    },
+    {
+      "paquete": "prisma",
+      "severidad": "high",
+      "directa": true,
+      "avisos": [],
+      "origen": [
+        "@prisma/config"
+      ],
+      "correccion": "prisma@7.10.1 (cambio mayor)",
+      "justificacion": "La herramienta de línea de comandos de Prisma solo corre al migrar y sembrar la base, con archivos del propio repositorio; no recibe datos de los usuarios. La corrección exige pasar a Prisma 7, un cambio mayor (adaptadores de base de datos y nueva configuración) que no cabe antes de la entrega. Queda para después del PMV."
+    }
+  ]
+}

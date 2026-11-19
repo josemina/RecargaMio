@@ -1,0 +1,23 @@
+# Registro de decisiones de arquitectura (ADR)
+
+Cada decisión técnica que no esté en el plan se pregunta al equipo y se registra aquí con el siguiente número.
+
+- [ADR 0001 · Marco de React Native: Expo con TypeScript](0001-marco-react-native.md)
+- [ADR 0002 · Lenguaje del backend: TypeScript](0002-typescript-backend.md)
+- [ADR 0003 · Acceso a datos con Prisma](0003-prisma.md)
+- [ADR 0004 · Qué corre en Docker](0004-servicios-en-docker.md)
+- [ADR 0005 · La app móvil corre fuera de Docker](0005-app-fuera-de-docker.md)
+- [ADR 0006 · Integración de pagos: API directa de Wompi](0006-api-directa-wompi.md)
+- [ADR 0007 · Notificaciones con FCM solo en Android](0007-fcm-android.md)
+- [ADR 0008 · Confirmación del pago: webhook y reconciliación](0008-webhook-y-reconciliacion.md)
+- [ADR 0009 · Número de la tarjeta MIO cifrado y con HMAC](0009-cifrado-numero-tarjeta.md)
+- [ADR 0010 · Reglas del recaudo simulado](0010-reglas-recaudo-simulado.md)
+- [ADR 0011 · Autenticación, sesiones y recuperación de contraseña](0011-autenticacion-y-sesiones.md)
+- [ADR 0012 · Tarjetas, saldo e historial](0012-tarjetas-saldo-e-historial.md)
+- [ADR 0013 · Recargas, pasarela de pagos y confirmación del pago](0013-recargas-y-pasarela.md)
+- [ADR 0014 · Alertas de saldo bajo y notificaciones](0014-alertas-y-notificaciones.md)
+- [ADR 0015 · Perfil, rectificación de datos y eliminación de la cuenta](0015-perfil-y-eliminacion-de-cuenta.md)
+- [ADR 0016 · Pruebas de API, integración, carga y seguridad, y métricas](0016-pruebas-y-metricas.md)
+- [ADR 0017 · Base de la app móvil: componentes de Figma, sesión segura y navegación](0017-base-de-la-app-movil.md)
+- [ADR 0018 · Pantallas de la app: vacíos entre Figma y la API](0018-pantallas-de-la-app.md)
+- [ADR 0019 · Validación TRL 5: entorno de pruebas, accesibilidad, MASVS y usabilidad](0019-validacion-trl5.md)

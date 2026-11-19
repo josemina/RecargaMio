@@ -1,0 +1,125 @@
+{
+  "generadoEn": "2026-11-18T23:35:35.044Z",
+  "pantallas": [
+    {
+      "pantalla": "1.1 Inicio de sesión",
+      "controles": 4,
+      "campos": 2,
+      "problemas": []
+    },
+    {
+      "pantalla": "1.3 Crear cuenta",
+      "controles": 5,
+      "campos": 4,
+      "problemas": []
+    },
+    {
+      "pantalla": "1.4 Recuperar contraseña",
+      "controles": 2,
+      "campos": 1,
+      "problemas": []
+    },
+    {
+      "pantalla": "Política de tratamiento de datos",
+      "controles": 0,
+      "campos": 0,
+      "problemas": []
+    },
+    {
+      "pantalla": "2.1 Mis tarjetas",
+      "controles": 10,
+      "campos": 0,
+      "problemas": []
+    },
+    {
+      "pantalla": "2.2 Agregar tarjeta",
+      "controles": 1,
+      "campos": 2,
+      "problemas": []
+    },
+    {
+      "pantalla": "2.3 Detalle de tarjeta",
+      "controles": 6,
+      "campos": 0,
+      "problemas": []
+    },
+    {
+      "pantalla": "3.1 Recargar saldo",
+      "controles": 17,
+      "campos": 0,
+      "problemas": []
+    },
+    {
+      "pantalla": "3.2 Recargar a otra persona",
+      "controles": 12,
+      "campos": 2,
+      "problemas": []
+    },
+    {
+      "pantalla": "4.1 Historial",
+      "controles": 8,
+      "campos": 0,
+      "problemas": []
+    },
+    {
+      "pantalla": "4.2 Alertas de saldo bajo",
+      "controles": 9,
+      "campos": 0,
+      "problemas": []
+    },
+    {
+      "pantalla": "Bandeja de avisos",
+      "controles": 0,
+      "campos": 0,
+      "problemas": []
+    },
+    {
+      "pantalla": "5.1 Perfil",
+      "controles": 10,
+      "campos": 0,
+      "problemas": []
+    },
+    {
+      "pantalla": "5.2 Privacidad y datos",
+      "controles": 4,
+      "campos": 0,
+      "problemas": []
+    },
+    {
+      "pantalla": "Datos personales",
+      "controles": 2,
+      "campos": 2,
+      "problemas": []
+    },
+    {
+      "pantalla": "5.3 Ayuda y PQR",
+      "controles": 6,
+      "campos": 0,
+      "problemas": []
+    },
+    {
+      "pantalla": "2.4 Límite de tarjetas",
+      "controles": 2,
+      "campos": 2,
+      "problemas": []
+    },
+    {
+      "pantalla": "3.3 Esperando confirmación",
+      "controles": 19,
+      "campos": 1,
+      "problemas": []
+    },
+    {
+      "pantalla": "3.4 Recarga exitosa",
+      "controles": 19,
+      "campos": 1,
+      "problemas": []
+    },
+    {
+      "pantalla": "3.5 Pago rechazado",
+      "controles": 20,
+      "campos": 1,
+      "problemas": []
+    }
+  ]
+}

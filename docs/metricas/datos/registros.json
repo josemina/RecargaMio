@@ -1,0 +1,79 @@
+{
+  "generadoEn": "2026-11-18T23:35:44.144Z",
+  "lineas": {
+    "api": 2226,
+    "recaudo-sim": 5677
+  },
+  "hallazgos": [
+    {
+      "id": "jwt",
+      "descripcion": "Token JWT (de acceso)",
+      "api": 0,
+      "recaudo-sim": 0,
+      "ejemplos": []
+    },
+    {
+      "id": "bearer",
+      "descripcion": "Encabezado Authorization con token",
+      "api": 0,
+      "recaudo-sim": 0,
+      "ejemplos": []
+    },
+    {
+      "id": "contrasena",
+      "descripcion": "Contraseña con valor",
+      "api": 0,
+      "recaudo-sim": 0,
+      "ejemplos": []
+    },
+    {
+      "id": "token-url",
+      "descripcion": "Token de recuperación en una URL",
+      "api": 0,
+      "recaudo-sim": 0,
+      "ejemplos": []
+    },
+    {
+      "id": "token-renovacion",
+      "descripcion": "Token de renovación con valor",
+      "api": 0,
+      "recaudo-sim": 0,
+      "ejemplos": []
+    },
+    {
+      "id": "celular",
+      "descripcion": "Número de celular (Nequi o PSE)",
+      "api": 0,
+      "recaudo-sim": 0,
+      "ejemplos": []
+    },
+    {
+      "id": "correo",
+      "descripcion": "Correo electrónico",
+      "api": 0,
+      "recaudo-sim": 0,
+      "ejemplos": []
+    },
+    {
+      "id": "documento",
+      "descripcion": "Número de documento de PSE",
+      "api": 0,
+      "recaudo-sim": 0,
+      "ejemplos": []
+    },
+    {
+      "id": "llave-wompi",
+      "descripcion": "Llave o secreto de Wompi",
+      "api": 0,
+      "recaudo-sim": 0,
+      "ejemplos": []
+    },
+    {
+      "id": "llave-recaudo",
+      "descripcion": "Llave del recaudo (X-Api-Key) con valor",
+      "api": 0,
+      "recaudo-sim": 0,
+      "ejemplos": []
+    }
+  ]
+}

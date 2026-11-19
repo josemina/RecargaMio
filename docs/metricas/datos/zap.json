@@ -1,0 +1,55 @@
+{
+  "fecha": "2026-11-18T20:23:41.720Z",
+  "version": "2.16.1",
+  "alertas": [
+    {
+      "id": "10202",
+      "nombre": "Absence of Anti-CSRF Tokens",
+      "riesgo": 2,
+      "confianza": "1",
+      "instancias": 2
+    },
+    {
+      "id": "100001",
+      "nombre": "Unexpected Content-Type was returned",
+      "riesgo": 1,
+      "confianza": "3",
+      "instancias": 257
+    },
+    {
+      "id": "10116",
+      "nombre": "ZAP is Out of Date",
+      "riesgo": 1,
+      "confianza": "3",
+      "instancias": 1
+    },
+    {
+      "id": "100000",
+      "nombre": "A Client Error response code was returned by the server",
+      "riesgo": 0,
+      "confianza": "3",
+      "instancias": 1524
+    },
+    {
+      "id": "10024",
+      "nombre": "Information Disclosure - Sensitive Information in URL",
+      "riesgo": 0,
+      "confianza": "2",
+      "instancias": 1
+    },
+    {
+      "id": "10049",
+      "nombre": "Non-Storable Content",
+      "riesgo": 0,
+      "confianza": "2",
+      "instancias": 13
+    },
+    {
+      "id": "10104",
+      "nombre": "User Agent Fuzzer",
+      "riesgo": 0,
+      "confianza": "2",
+      "instancias": 12
+    }
+  ]
+}

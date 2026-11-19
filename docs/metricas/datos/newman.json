@@ -1,0 +1,14 @@
+{
+  "fecha": "2026-11-18T20:24:19.673Z",
+  "duracionSegundos": 10,
+  "peticiones": {
+    "total": 46,
+    "fallidas": 0
+  },
+  "aserciones": {
+    "total": 87,
+    "fallidas": 0
+  },
+  "tiempoMedioMs": 27,
+  "fallas": []
+}
