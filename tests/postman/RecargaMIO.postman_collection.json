@@ -1,0 +1,1834 @@
+{
+  "info": {
+    "name": "RecargaMIO",
+    "description": "Pruebas de contrato de la API de RecargaMIO (T8, ADR 0016). Recorre el flujo completo con una cuenta nueva y la elimina al final.\n\nCorre con Newman desde Docker: `docker compose --profile pruebas run --rm newman` o, todo junto, `npm run pruebas`.\n\nModo de pruebas: la pasarela es la simulada o Wompi Sandbox. Nunca se mueve dinero real.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1 · Estado y contrato",
+      "item": [
+        {
+          "name": "Salud de la API",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('La base responde', () => pm.expect(pm.response.json().baseDatos).to.eql('ok'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Contrato OpenAPI",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/docs/openapi.json",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "docs",
+                "openapi.json"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Es OpenAPI 3.1', () => pm.expect(pm.response.json().openapi).to.eql('3.1.0'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 · Registro e ingreso (HU-06)",
+      "item": [
+        {
+          "name": "Registro sin aceptar la política → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "registro"
+              ]
+            },
+            "description": "HU-06 CA-2: sin autorización de datos no se crea la cuenta (Ley 1581 de 2012).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Prueba Postman\",\n  \"correo\": \"{{correo}}\",\n  \"contrasena\": \"{{clave}}\",\n  \"aceptaPolitica\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Cuenta nueva en cada corrida: la colección la elimina al final (T7)",
+                  "pm.collectionVariables.set('correo', `postman-${Date.now()}@recargamio.test`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Código de error POLITICA_NO_ACEPTADA', () => pm.expect(pm.response.json().error.codigo).to.eql('POLITICA_NO_ACEPTADA'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registro con contraseña débil → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "registro"
+              ]
+            },
+            "description": "HU-06 CA-1: mínimo 8 caracteres con letras y números.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Prueba Postman\",\n  \"correo\": \"{{correo}}\",\n  \"contrasena\": \"corta\",\n  \"aceptaPolitica\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Código de error DATOS_INVALIDOS', () => pm.expect(pm.response.json().error.codigo).to.eql('DATOS_INVALIDOS'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registro",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "registro"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Prueba Postman\",\n  \"correo\": \"{{correo}}\",\n  \"contrasena\": \"{{clave}}\",\n  \"aceptaPolitica\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const r = pm.response.json();",
+                  "pm.test('Abre la sesión', () => { pm.expect(r.tokenAcceso).to.be.a('string'); pm.expect(r.tokenRenovacion).to.be.a('string'); });",
+                  "pm.test('No devuelve la contraseña ni su hash', () => pm.expect(pm.response.text()).to.not.match(/contrasena|hash/i));",
+                  "pm.collectionVariables.set('tokenAcceso', r.tokenAcceso);",
+                  "pm.collectionVariables.set('tokenRenovacion', r.tokenRenovacion);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registro con el mismo correo → 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "registro"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Prueba Postman\",\n  \"correo\": \"{{correo}}\",\n  \"contrasena\": \"{{clave}}\",\n  \"aceptaPolitica\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Código de error CORREO_REGISTRADO', () => pm.expect(pm.response.json().error.codigo).to.eql('CORREO_REGISTRADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ingreso con contraseña incorrecta → 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/ingreso",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "ingreso"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"{{correo}}\",\n  \"contrasena\": \"Equivocada123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Código de error CREDENCIALES_INVALIDAS', () => pm.expect(pm.response.json().error.codigo).to.eql('CREDENCIALES_INVALIDAS'));",
+                  "pm.test('Informa los intentos restantes (HU-06 CA-4)', () => pm.expect(pm.response.json().error.intentosRestantes).to.eql(4));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ingreso",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/ingreso",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "ingreso"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"{{correo}}\",\n  \"contrasena\": \"{{clave}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Responde en menos de 2 s (RNF-01)', () => pm.expect(pm.response.responseTime).to.be.below(2000));",
+                  "pm.collectionVariables.set('tokenAcceso', r.tokenAcceso);",
+                  "pm.collectionVariables.set('tokenRenovacion', r.tokenRenovacion);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Renovar el token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/renovar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "renovar"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tokenRenovacion\": \"{{tokenRenovacion}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Rota el token de renovación', () => pm.expect(r.tokenRenovacion).to.not.eql(pm.collectionVariables.get('tokenRenovacion')));",
+                  "pm.collectionVariables.set('tokenAcceso', r.tokenAcceso);",
+                  "pm.collectionVariables.set('tokenRenovacion', r.tokenRenovacion);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Perfil",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Registra la versión de la política aceptada (Ley 1581)', () => pm.expect(r.politica.version).to.be.a('string'));",
+                  "pm.test('Es la cuenta recién creada', () => pm.expect(r.correo).to.eql(pm.collectionVariables.get('correo')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rectificar el nombre",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Prueba Postman Rectificada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Cambia el nombre', () => pm.expect(pm.response.json().nombre).to.eql('Prueba Postman Rectificada'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 · Tarjetas y alerta (HU-03, HU-05, HU-07)",
+      "item": [
+        {
+          "name": "Tarjetas sin sesión → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tarjetas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tarjetas"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Código de error NO_AUTENTICADO', () => pm.expect(pm.response.json().error.codigo).to.eql('NO_AUTENTICADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Agregar tarjeta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tarjetas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tarjetas"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"numero\": \"7730000001\",\n  \"alias\": \"Tarjeta Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const r = pm.response.json();",
+                  "pm.test('Devuelve solo los últimos 4 dígitos', () => { pm.expect(r.tarjeta.ultimos4).to.eql('0001'); pm.expect(pm.response.text()).to.not.include('7730000001'); });",
+                  "pm.test('Trae el saldo del recaudo', () => pm.expect(r.tarjeta.saldo).to.be.a('number'));",
+                  "pm.collectionVariables.set('tarjetaId', r.tarjeta.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Agregar la misma tarjeta → 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tarjetas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tarjetas"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"numero\": \"7730000001\",\n  \"alias\": \"Repetida\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Código de error TARJETA_YA_REGISTRADA', () => pm.expect(pm.response.json().error.codigo).to.eql('TARJETA_YA_REGISTRADA'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Agregar tarjeta que no existe → 422",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tarjetas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tarjetas"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"numero\": \"1111111111\",\n  \"alias\": \"No existe\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 422', () => pm.response.to.have.status(422));",
+                  "pm.test('Código de error TARJETA_NO_EXISTE', () => pm.expect(pm.response.json().error.codigo).to.eql('TARJETA_NO_EXISTE'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar tarjetas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tarjetas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tarjetas"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Una tarjeta de máximo 5', () => { pm.expect(r.registradas).to.eql(1); pm.expect(r.maximo).to.eql(5); });",
+                  "pm.test('Responde en menos de 2 s (RNF-01)', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alerta fuera de rango → 400",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tarjetas/{{tarjetaId}}/alerta",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tarjetas",
+                "{{tarjetaId}}",
+                "alerta"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"umbral\": 3000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Código de error DATOS_INVALIDOS', () => pm.expect(pm.response.json().error.codigo).to.eql('DATOS_INVALIDOS'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Configurar la alerta",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tarjetas/{{tarjetaId}}/alerta",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tarjetas",
+                "{{tarjetaId}}",
+                "alerta"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"umbral\": 20000,\n  \"activa\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Guarda el umbral (HU-05 CA-1)', () => pm.expect(pm.response.json().alerta).to.eql({ umbral: 20000, activa: true }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Movimientos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/tarjetas/{{tarjetaId}}/movimientos?tipo=todo&limite=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tarjetas",
+                "{{tarjetaId}}",
+                "movimientos"
+              ],
+              "query": [
+                {
+                  "key": "tipo",
+                  "value": "todo"
+                },
+                {
+                  "key": "limite",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Trae la lista de movimientos', () => pm.expect(pm.response.json().movimientos).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 · Recargas (HU-01, HU-02)",
+      "item": [
+        {
+          "name": "Bancos de PSE",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pasarela/bancos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pasarela",
+                "bancos"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Hay bancos', () => pm.expect(pm.response.json().bancos.length).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recarga sin aceptar los términos de la pasarela → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recargas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recargas"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tarjetaId\": \"{{tarjetaId}}\",\n  \"monto\": 20000,\n  \"medioPago\": \"NEQUI\",\n  \"datosMedio\": {\n    \"celular\": \"3991111111\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Código de error TERMINOS_PASARELA_NO_ACEPTADOS', () => pm.expect(pm.response.json().error.codigo).to.eql('TERMINOS_PASARELA_NO_ACEPTADOS'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recarga con un monto no permitido → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recargas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recargas"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tarjetaId\": \"{{tarjetaId}}\",\n  \"monto\": 7000,\n  \"medioPago\": \"NEQUI\",\n  \"datosMedio\": {\n    \"celular\": \"3991111111\"\n  },\n  \"aceptaTerminosPasarela\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Código de error DATOS_INVALIDOS', () => pm.expect(pm.response.json().error.codigo).to.eql('DATOS_INVALIDOS'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recarga con Nequi",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recargas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recargas"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tarjetaId\": \"{{tarjetaId}}\",\n  \"monto\": 20000,\n  \"medioPago\": \"NEQUI\",\n  \"datosMedio\": {\n    \"celular\": \"3991111111\"\n  },\n  \"aceptaTerminosPasarela\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const r = pm.response.json();",
+                  "pm.test('Queda PENDIENTE hasta que la pasarela confirme (regla 3)', () => pm.expect(r.estado).to.eql('PENDIENTE'));",
+                  "pm.test('El total es el monto (HU-01 CA-2)', () => pm.expect(r.total).to.eql(20000));",
+                  "pm.test('No devuelve el celular de Nequi (regla 2)', () => pm.expect(pm.response.text()).to.not.include('3991111111'));",
+                  "pm.collectionVariables.set('recargaId', r.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Doble clic en Pagar → 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recargas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recargas"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tarjetaId\": \"{{tarjetaId}}\",\n  \"monto\": 20000,\n  \"medioPago\": \"NEQUI\",\n  \"datosMedio\": {\n    \"celular\": \"3991111111\"\n  },\n  \"aceptaTerminosPasarela\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Código de error RECARGA_EN_CURSO', () => pm.expect(pm.response.json().error.codigo).to.eql('RECARGA_EN_CURSO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Esperar la recarga aprobada",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recargas/{{recargaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recargas",
+                "{{recargaId}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "setTimeout(() => {}, 1000);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Consulta el estado cada segundo hasta que la recarga termine (máximo 30 intentos)",
+                  "const r = pm.response.json();",
+                  "const finales = ['ACREDITADA', 'RECHAZADA', 'ERROR'];",
+                  "const intentos = Number(pm.collectionVariables.get('intentos') || 0) + 1;",
+                  "pm.collectionVariables.set('intentos', intentos);",
+                  "if (!finales.includes(r.estado) && intentos < 30) {",
+                  "  postman.setNextRequest(pm.info.requestName);",
+                  "  return;",
+                  "}",
+                  "pm.collectionVariables.set('intentos', 0);",
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Se acredita (HU-01 CA-3)', () => pm.expect(r.estado).to.eql('ACREDITADA'));",
+                  "pm.test('Tiempo de recarga ≤ 180 s', () => pm.expect(r.tiempoSegundos).to.be.at.most(180));",
+                  "pm.test('Trae el comprobante (HU-01 CA-4)', () => { pm.expect(r.comprobante.referencia).to.eql(r.referencia); pm.expect(r.comprobante.nuevoSaldo).to.be.a('number'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recarga rechazada por Nequi",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recargas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recargas"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tarjetaId\": \"{{tarjetaId}}\",\n  \"monto\": 5000,\n  \"medioPago\": \"NEQUI\",\n  \"datosMedio\": {\n    \"celular\": \"3992222222\"\n  },\n  \"aceptaTerminosPasarela\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('recargaId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Esperar la recarga rechazada",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recargas/{{recargaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recargas",
+                "{{recargaId}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "setTimeout(() => {}, 1000);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Consulta el estado cada segundo hasta que la recarga termine (máximo 30 intentos)",
+                  "const r = pm.response.json();",
+                  "const finales = ['ACREDITADA', 'RECHAZADA', 'ERROR'];",
+                  "const intentos = Number(pm.collectionVariables.get('intentos') || 0) + 1;",
+                  "pm.collectionVariables.set('intentos', intentos);",
+                  "if (!finales.includes(r.estado) && intentos < 30) {",
+                  "  postman.setNextRequest(pm.info.requestName);",
+                  "  return;",
+                  "}",
+                  "pm.collectionVariables.set('intentos', 0);",
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Queda RECHAZADA y no acredita saldo (HU-02)', () => { pm.expect(r.estado).to.eql('RECHAZADA'); pm.expect(r.acreditadaEn).to.eql(null); });",
+                  "pm.test('Explica que no hubo cobro', () => pm.expect(r.mensaje).to.include('no cambió'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5 · Integraciones protegidas",
+      "item": [
+        {
+          "name": "Webhook con firma falsa → 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Event-Checksum",
+                "value": "0000000000000000000000000000000000000000000000000000000000000000"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/wompi",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "wompi"
+              ]
+            },
+            "description": "Regla 4: sin checksum válido no se acredita nada.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"transaction.updated\",\n  \"data\": {\n    \"transaction\": {\n      \"id\": \"falso\",\n      \"reference\": \"RM-FALSA\",\n      \"status\": \"APPROVED\",\n      \"amount_in_cents\": 5000000\n    }\n  },\n  \"environment\": \"test\",\n  \"signature\": {\n    \"properties\": [\n      \"transaction.id\",\n      \"transaction.status\",\n      \"transaction.amount_in_cents\"\n    ],\n    \"checksum\": \"0000000000000000000000000000000000000000000000000000000000000000\"\n  },\n  \"timestamp\": 1700000000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Código de error FIRMA_INVALIDA', () => pm.expect(pm.response.json().error.codigo).to.eql('FIRMA_INVALIDA'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Aviso interno sin la llave del recaudo → 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/internos/recaudo/viajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "internos",
+                "recaudo",
+                "viajes"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"numero\": \"7730000001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Código de error NO_AUTORIZADO', () => pm.expect(pm.response.json().error.codigo).to.eql('NO_AUTORIZADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ruta inexistente → 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/no-existe",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "no-existe"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Código de error NO_ENCONTRADO', () => pm.expect(pm.response.json().error.codigo).to.eql('NO_ENCONTRADO'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 · Notificaciones (HU-05)",
+      "item": [
+        {
+          "name": "Bandeja de avisos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notificaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notificaciones"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Avisó la recarga exitosa', () => pm.expect(r.notificaciones.map((n) => n.tipo)).to.include('RECARGA_EXITOSA'));",
+                  "pm.test('Hay avisos sin leer', () => pm.expect(r.noLeidas).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Marcar todo como leído",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notificaciones/leidas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notificaciones",
+                "leidas"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Marca al menos uno', () => pm.expect(pm.response.json().marcadas).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar el teléfono",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dispositivos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dispositivos"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"token-de-prueba-postman-1234567890\",\n  \"plataforma\": \"android\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Quitar el teléfono",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dispositivos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dispositivos"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"token-de-prueba-postman-1234567890\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7 · Cierre y eliminación de la cuenta (T7)",
+      "item": [
+        {
+          "name": "Cerrar sesión",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/salir",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "salir"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tokenRenovacion\": \"{{tokenRenovacion}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El token de la sesión cerrada ya no sirve → 401",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me"
+              ]
+            },
+            "description": "HU-06 CA-3."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Código de error SESION_INVALIDA', () => pm.expect(pm.response.json().error.codigo).to.eql('SESION_INVALIDA'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ingresar de nuevo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/ingreso",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "ingreso"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"{{correo}}\",\n  \"contrasena\": \"{{clave}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('tokenAcceso', pm.response.json().tokenAcceso);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar la cuenta con contraseña incorrecta → 403",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contrasena\": \"Equivocada123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Código de error CONTRASENA_INCORRECTA', () => pm.expect(pm.response.json().error.codigo).to.eql('CONTRASENA_INCORRECTA'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Eliminar la cuenta",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenAcceso}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contrasena\": \"{{clave}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Elimina la cuenta y su tarjeta', () => { pm.expect(r.eliminada).to.eql(true); pm.expect(r.tarjetas).to.eql(1); });",
+                  "pm.test('Conserva anonimizadas las 2 recargas', () => pm.expect(r.recargasAnonimizadas).to.eql(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ya no se puede ingresar → 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/ingreso",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "ingreso"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"{{correo}}\",\n  \"contrasena\": \"{{clave}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Código de error CREDENCIALES_INVALIDAS', () => pm.expect(pm.response.json().error.codigo).to.eql('CREDENCIALES_INVALIDAS'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "clave",
+      "value": "ClavePostman2026",
+      "description": "Contraseña de la cuenta desechable que crea la colección"
+    },
+    {
+      "key": "correo",
+      "value": ""
+    },
+    {
+      "key": "tokenAcceso",
+      "value": ""
+    },
+    {
+      "key": "tokenRenovacion",
+      "value": ""
+    },
+    {
+      "key": "tarjetaId",
+      "value": ""
+    },
+    {
+      "key": "recargaId",
+      "value": ""
+    },
+    {
+      "key": "intentos",
+      "value": "0"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "descripcion": "Hallazgos de axe-core que se aceptan, con su justificación (T11, ADR 0019). Se aplican por regla y, si se indica, solo en algunas pantallas.",
+  "reglas": {
+    "label-content-name-mismatch": "Revisado: las etiquetas empiezan con el texto visible del control (por ejemplo, «Mi tarjeta»), pero leen los montos como «6.000 pesos» en lugar de «$6.000», porque TalkBack lee el símbolo como «dólares» (ADR 0017). En las filas con descripción (5.2) es un falso positivo: axe une el título y la descripción, que van en dos renglones, sin un espacio entre ellos."
+  }
+}
