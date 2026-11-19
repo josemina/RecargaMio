@@ -463,11 +463,48 @@ El manual se escribe en Markdown dentro de `docs/manual/` y se convierte a Word 
 npm run manual
 ```
 
-Los archivos quedan en `docs/manual/entregables/`. Para volver a tomar las capturas de evidencia, con los servicios levantados (y, para las capturas de la app, la versión web de Expo en el puerto 8081 y `CORS_ORIGENES=http://localhost:8081` en `.env`; el script crea una cuenta desechable y la elimina al final):
+Los archivos quedan en `docs/manual/entregables/`: el manual en Word y PDF, y los insumos para el documento maestro en Word (T12). Solo el PDF del manual va en el repositorio; los Word van en el *Release* de la entrega. Para volver a tomar las capturas de evidencia, con los servicios levantados (y, para las capturas de la app, la versión web de Expo en el puerto 8081 y `CORS_ORIGENES=http://localhost:8081` en `.env`; el script crea una cuenta desechable y la elimina al final):
 
 ```bash
 npm run manual:capturas
 ```
+
+## Trabajar con el repositorio y entregar (T12)
+
+El repositorio está en `https://github.com/josemina/RecargaMio`. Cada tarea se hace en su propia rama y entra a `main` por *pull request* (ADR 0020):
+
+1. Crear la rama desde `main` actualizada:
+
+   ```bash
+   git switch main && git pull && git switch -c tarea/NOMBRE
+   ```
+
+2. Antes de cada commit, revisar que no se cuele ningún secreto:
+
+   ```bash
+   npm run revisar:secretos
+   ```
+
+3. Hacer commits con el formato de `CLAUDE.md` (por ejemplo `feat(HU-01): …`), subir la rama y abrir el *pull request* en GitHub.
+4. La **integración continua** (`.github/workflows/ci.yml`) corre en cada *push* y *pull request* la revisión de secretos, el lint, los tipos y las pruebas de la API, del recaudo y de la app. El *pull request* se fusiona solo con todo en verde.
+
+<!-- tabla: Trabajos de la integración continua -->
+| Trabajo | Qué revisa |
+|---|---|
+| Secretos, lint y tipos | `npm run revisar:secretos`, ESLint y TypeScript en todo el monorepo |
+| Pruebas de la API | Las pruebas de Jest contra un PostgreSQL de servicio (`recargamio_pruebas`) |
+| Pruebas del recaudo simulado | Las pruebas de Jest contra `recaudo_pruebas` |
+| Pruebas de la app móvil | Las pruebas de Jest, incluida la revisión de accesibilidad de las 20 pantallas |
+
+Las pruebas pesadas de la Tabla 18 (Newman, 200 recargas, JMeter y ZAP) no corren en la integración continua: se corren en el equipo con `npm run pruebas`.
+
+**Para la entrega:**
+1. Correr `npm run pruebas` con el cargador conectado.
+2. Correr `npm run manual`.
+3. Correr `npm run entrega:paquete`, que arma `entrega/RecargaMIO-entrega-AAAA-MM-DD.zip` con el manual en Word y PDF, los insumos, `docs/metricas/` y los reportes completos.
+4. En GitHub, crear un *Release* (por ejemplo `v1.0-fase4`) y adjuntar ese archivo.
+
+El guion del video y los insumos para el documento maestro están en `docs/entrega/`.
 
 ## Solución de problemas
 
@@ -514,6 +551,8 @@ npm run manual:capturas
 | `npm run lint` de la app falla con `contextOrFilename.getFilename is not a function` | Se usó el ESLint 10 de la raíz en lugar del ESLint 9 de la app | Córrelo con `npm run lint --workspace apps/mobile` |
 | En la web, la app dice «No pudimos conectarnos con RecargaMIO» | Falta `CORS_ORIGENES=http://localhost:8081` en `.env`, o la API no se reinició después de agregarlo | Agrégalo y corre `docker compose up -d api` |
 | En la web, al recargar la página vuelve a pedir el ingreso | Es intencional: en la web la sesión vive solo en memoria (ADR 0017) | Ingresa de nuevo. En el teléfono la sesión se guarda en el almacén seguro |
+| `npm run revisar:secretos` dice «NO SUBAS ESTOS CAMBIOS» | Un archivo de la lista tiene un secreto real, es un `.env` o un reporte, o pesa más de 10 MB | Quita el dato o el archivo. Si es una cadena que no es secreta (por ejemplo, un ejemplo de documentación), agrégala con su justificación a `tests/seguridad/secretos-aceptados.json` |
+| La integración continua falla en GitHub y en el equipo todo pasa | Falta un archivo que en el equipo está en `.gitignore`, o el `package-lock.json` no está actualizado | Corre `npm install` y sube el `package-lock.json`; revisa el registro del trabajo en la pestaña *Actions* |
 | `npm run demo` dice que la API no responde por la IP de la red | El firewall bloquea el puerto 3000 o macOS no le dio a la terminal el permiso de «Red local» | Permite el puerto 3000 y, en macOS, activa la terminal en **Ajustes del Sistema → Privacidad y seguridad → Red local**; vuelve a correr `npm run demo` |
 | `npm run pruebas` falla en «Dependencias» | `npm audit` encontró un aviso alto o crítico nuevo | Actualiza el paquete o, si no aplica al prototipo, justifícalo en `tests/seguridad/dependencias-aceptadas.json` |
 | Las capturas de la app fallan con un tiempo agotado | Se superó el límite de 10 ingresos cada 15 minutos (varias corridas seguidas) | Espera 15 minutos o reinicia la API: `docker compose restart api` |

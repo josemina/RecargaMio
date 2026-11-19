@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "capturas": "node capturas.mjs",
-    "generar": "node generar.mjs"
+    "generar": "node generar.mjs && node generar.mjs insumos"
   },
   "dependencies": {
     "axe-core": "^4.14.1",

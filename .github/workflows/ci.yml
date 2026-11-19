@@ -1,0 +1,114 @@
+# Integración continua de RecargaMIO (T12, HT-01, ADR 0020).
+# Corre en cada push y en cada pull request: revisión de secretos, lint, tipos y las pruebas unitarias de los tres paquetes.
+# Las pruebas pesadas de la Tabla 18 (Newman, 200 recargas, JMeter y ZAP) siguen siendo locales: `npm run pruebas`.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: '1'
+  PRISMA_HIDE_UPDATE_MESSAGE: '1'
+
+jobs:
+  calidad:
+    name: Secretos, lint y tipos
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Revisión de secretos (regla 1 de CLAUDE.md)
+        run: node scripts/revisar-secretos.mjs
+      - run: npm ci --no-audit --no-fund
+      - name: Clientes de Prisma
+        run: |
+          npm run prisma:generate --workspace services/api
+          npm run prisma:generate --workspace services/recaudo-sim
+      - run: npm run lint
+      - run: npm run typecheck
+
+  api:
+    name: Pruebas de la API
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      # Solo para las pruebas: usuario y contraseña de este contenedor efímero, no son secretos del proyecto
+      db:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: recargamio
+          POSTGRES_PASSWORD: pruebas-ci
+          POSTGRES_DB: recargamio_pruebas
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U recargamio"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Las pruebas se niegan a correr en una base cuyo nombre no termine en _pruebas
+      DATABASE_URL_PRUEBAS: postgresql://recargamio:pruebas-ci@localhost:5432/recargamio_pruebas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run prisma:generate --workspace services/api
+      - run: npm test --workspace services/api
+
+  recaudo:
+    name: Pruebas del recaudo simulado
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      db:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: recargamio
+          POSTGRES_PASSWORD: pruebas-ci
+          POSTGRES_DB: recaudo_pruebas
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U recargamio"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL_PRUEBAS: postgresql://recargamio:pruebas-ci@localhost:5432/recaudo_pruebas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run prisma:generate --workspace services/recaudo-sim
+      - run: npm test --workspace services/recaudo-sim
+
+  app:
+    name: Pruebas de la app móvil
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Pruebas (incluye la revisión de accesibilidad de las 20 pantallas)
+        run: npm test --workspace apps/mobile -- --ci

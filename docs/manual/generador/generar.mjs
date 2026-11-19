@@ -18,10 +18,39 @@ const dirManual = path.resolve(aqui, '..');
 const dirSalida = path.join(dirManual, 'entregables');
 mkdirSync(dirSalida, { recursive: true });
 
+// ---------- Qué documento se genera ----------
+//   node generar.mjs            el manual (Word y PDF)
+//   node generar.mjs insumos    los insumos para el documento maestro (solo Word, T12, ADR 0020)
+const DOCUMENTOS = {
+  manual: {
+    titulo: 'Manual técnico y de usuario de RecargaMIO',
+    archivo: 'Manual_RecargaMIO',
+    pie: 'Manual',
+    pdf: true,
+    capitulos: [
+      { archivo: path.join(dirManual, '01-instalacion-y-operacion.md') },
+      { archivo: path.join(dirManual, '02-arquitectura.md') },
+      { archivo: path.join(dirManual, '03-manual-de-usuario.md') },
+      { archivo: path.join(dirManual, '04-pruebas-y-resultados.md') },
+      { archivo: path.join(dirManual, '05-validacion-trl5.md') },
+      { archivo: path.resolve(dirManual, '../sprints/bitacora.md'), prefijo: 'Anexo A. ' },
+    ],
+  },
+  insumos: {
+    titulo: 'Insumos para el documento maestro de RecargaMIO',
+    archivo: 'Insumos_documento_maestro',
+    pie: 'Insumos',
+    pdf: false,
+    capitulos: [{ archivo: path.resolve(dirManual, '../entrega/insumos-documento-maestro.md') }],
+  },
+};
+const DOCUMENTO = DOCUMENTOS[process.argv[2] ?? 'manual'];
+if (!DOCUMENTO) throw new Error(`Documento desconocido: ${process.argv[2]}. Opciones: ${Object.keys(DOCUMENTOS).join(', ')}`);
+
 // ---------- Datos de la portada ----------
 // Orden y textos según la portada de la guía metodológica del documento maestro (UNAD)
 const PORTADA = {
-  titulo: 'Manual técnico y de usuario de RecargaMIO',
+  titulo: DOCUMENTO.titulo,
   subtitulo: 'App móvil RecargaMIO: prototipo para la recarga digital y la gestión de tarjetas del sistema MIO en Santiago de Cali',
   integrantes: ['Viviana Andrea Andrade Torres', 'Jose Luis Mina Cuero', 'Julian Andres Ospina Roncancio'],
   curso: '202016907 - Proyecto de grado',
@@ -34,15 +63,8 @@ const fecha = new Date();
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const fechaTexto = `${fecha.getDate()} de ${MESES[fecha.getMonth()]} de ${fecha.getFullYear()}`;
 
-// ---------- Fuentes (orden del manual) ----------
-const CAPITULOS = [
-  { archivo: path.join(dirManual, '01-instalacion-y-operacion.md') },
-  { archivo: path.join(dirManual, '02-arquitectura.md') },
-  { archivo: path.join(dirManual, '03-manual-de-usuario.md') },
-  { archivo: path.join(dirManual, '04-pruebas-y-resultados.md') },
-  { archivo: path.join(dirManual, '05-validacion-trl5.md') },
-  { archivo: path.resolve(dirManual, '../sprints/bitacora.md'), prefijo: 'Anexo A. ' },
-];
+// ---------- Fuentes ----------
+const CAPITULOS = DOCUMENTO.capitulos;
 
 // ---------- Lectura y numeración común a Word y PDF ----------
 const decodificar = (t = '') =>
@@ -333,7 +355,7 @@ async function generarWord({ capitulos, listaFiguras, listaTablas }) {
         default: new Header({ children: [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: SENCILLO, children: [new TextRun({ children: [PageNumber.CURRENT] })] })] }),
       },
       footers: {
-        default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: SENCILLO, children: [new TextRun({ text: `RecargaMIO · Manual generado el ${fechaTexto}`, size: 16, color: '6F7889' })] })] }),
+        default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: SENCILLO, children: [new TextRun({ text: `RecargaMIO · ${DOCUMENTO.pie} generado el ${fechaTexto}`, size: 16, color: '6F7889' })] })] }),
       },
       children: [
         ...portadaWord(),
@@ -346,7 +368,7 @@ async function generarWord({ capitulos, listaFiguras, listaTablas }) {
       ],
     }],
   });
-  const archivo = path.join(dirSalida, 'Manual_RecargaMIO.docx');
+  const archivo = path.join(dirSalida, `${DOCUMENTO.archivo}.docx`);
   writeFileSync(archivo, await Packer.toBuffer(documento));
   return archivo;
 }
@@ -431,14 +453,14 @@ async function generarPdf({ capitulos, listaFiguras, listaTablas }) {
   const navegador = await chromium.launch({ channel: 'chrome' });
   const pagina = await navegador.newPage();
   await pagina.goto(pathToFileURL(archivoHtml).href, { waitUntil: 'load' });
-  const archivo = path.join(dirSalida, 'Manual_RecargaMIO.pdf');
+  const archivo = path.join(dirSalida, `${DOCUMENTO.archivo}.pdf`);
   await pagina.pdf({
     path: archivo,
     format: 'Letter',
     printBackground: true,
     displayHeaderFooter: true,
     headerTemplate: '<div style="width:100%;font:10pt \'Times New Roman\';text-align:right;padding-right:2.54cm"><span class="pageNumber"></span></div>',
-    footerTemplate: `<div style="width:100%;font:7pt Arial;color:#6F7889;text-align:center">RecargaMIO · Manual generado el ${fechaTexto}</div>`,
+    footerTemplate: `<div style="width:100%;font:7pt Arial;color:#6F7889;text-align:center">RecargaMIO · ${DOCUMENTO.pie} generado el ${fechaTexto}</div>`,
     margin: { top: '2.54cm', bottom: '2.54cm', left: '2.54cm', right: '2.54cm' },
   });
   await navegador.close();
@@ -449,5 +471,7 @@ const capitulosWord = prepararCapitulos();
 const capitulosPdf = prepararCapitulos();
 const word = await generarWord(capitulosWord);
 console.log('✔ Word:', path.relative(process.cwd(), word));
-const pdf = await generarPdf(capitulosPdf);
-console.log('✔ PDF: ', path.relative(process.cwd(), pdf));
+if (DOCUMENTO.pdf) {
+  const pdf = await generarPdf(capitulosPdf);
+  console.log('✔ PDF: ', path.relative(process.cwd(), pdf));
+}

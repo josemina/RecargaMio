@@ -25,5 +25,12 @@ tests/seguridad/zap.yaml
 # Clientes de Prisma generados
 services/*/generated/
 
-# Archivo intermedio del generador del manual
-docs/manual/entregables/manual.html
+# Archivos intermedios del generador del manual
+docs/manual/entregables/*.html
+
+# Los Word del manual y de los insumos van al Release de GitHub, no al repositorio (T12, ADR 0020, decisión D):
+# cada regeneración pesa unos 7 MB. El PDF del manual sí se sube.
+docs/manual/entregables/*.docx
+
+# Paquete de la entrega para el Release (npm run entrega:paquete)
+/entrega/

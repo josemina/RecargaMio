@@ -9,7 +9,7 @@ Las tareas del plan de implementación (T0 a T12) corresponden a los elementos d
 <!-- tabla: Equivalencia entre tareas, backlog y sprints -->
 | Tarea del plan | Elemento del backlog (Tabla 14) | Sprint (Tabla 17) | Puntos | Estado |
 |---|---|---|---|---|
-| T0 · Esqueleto y Docker | HT-01. Repositorio, estructura del proyecto e integración continua | Sprint 1 | 3 | Parcial: falta el repositorio en GitHub y la integración continua |
+| T0 · Esqueleto y Docker | HT-01. Repositorio, estructura del proyecto e integración continua | Sprint 1 | 3 | Terminada en T12: repositorio en GitHub e integración continua |
 | T1 · Base de datos | Parte del diseño (modelo de datos, Figura 5) | Sprint de diseño | — | Terminada |
 | T2 · Recaudo simulado | HT-02. Servicio simulado del sistema de recaudo | Sprint 2 | 5 | Terminada (adelantada) |
 | T3 · Autenticación | HU-06. Autenticación y cuenta segura | Sprint 1 | 5 | Terminada |
@@ -22,6 +22,7 @@ Las tareas del plan de implementación (T0 a T12) corresponden a los elementos d
 | T9 · Base de la app móvil | Parte de HT-01 (estructura del proyecto) y base de HU-01 a HU-07 en la app | Sprint 1 | — | Terminada: catálogo igual a la página 02 de Figma, sesión segura y navegación |
 | T10 · Pantallas de la app | HU-01 a HU-07 en la app (pantallas 1.1 a 5.3 de Figma) | Sprints 1 a 4 | — | Terminada en la web contra la API en Docker. Falta la prueba en un teléfono Android real |
 | T11 · Validación TRL 5 | HT-03. Despliegue y datos de prueba; metas de usabilidad, accesibilidad y seguridad (Tabla 9) | Cierre | 3 | Preparada y automatizada. Faltan TalkBack, la prueba SUS con 15 personas y el teléfono Android, que hace el equipo |
+| T12 · Entrega | Cierre de HT-01; lista de entrega de la Fase 4 (sección 15 del plan) | Cierre | — | Terminada en lo que depende del código. Faltan el video, el acceso del tutor y copiar los insumos al documento maestro |
 
 ## Resumen
 
@@ -42,6 +43,7 @@ Las tareas del plan de implementación (T0 a T12) corresponden a los elementos d
 | T9 · Base de la app móvil | 2026-11-18 | Base de HU-01 a HU-07 (app) | Criterio cumplido: el catálogo muestra los 14 componentes, la barra de navegación y los 30 íconos de la página 02 | 55 de 55 (app), 249 de 249 (API) y 37 de 37 (recaudo) |
 | T10 · Pantallas de la app | 2026-11-18 | HU-01 a HU-07 (app) | El flujo 1.1 → 2.1 → 3.1 → 3.3 → 3.4 → 4.1 funciona en la web contra la API en Docker y en las pruebas; falta el teléfono Android | 84 de 84 (app), 249 de 249 (API) y 37 de 37 (recaudo) |
 | T11 · Validación TRL 5 | 2026-11-18 | HT-03, RNF-03 a RNF-05 | Entorno de pruebas, accesibilidad automática sin críticos, lista MASVS, `npm audit` y registros limpios; SUS y TalkBack preparados para el equipo | 104 de 104 (app), 249 de 249 (API), 37 de 37 (recaudo), 87 de 87 aserciones y 200 de 200 recargas |
+| T12 · Entrega | 2026-11-18 | HT-01 | README, integración continua, revisión de secretos, guion del video, paquete del Release e insumos del documento maestro | CI simulada en Linux: 249 de 249 (API) y 104 de 104 (app); lint y tipos sin errores |
 
 ## Preparación del entorno
 
@@ -868,4 +870,61 @@ El detalle completo, con la media, la mediana y el percentil 95 por endpoint y p
 4. Hacer las 15 sesiones de usabilidad y pasar las respuestas a `docs/metricas/datos/sus.csv`. Después, `npm run demo:limpiar`, `npm run metricas` y `npm run manual`.
 5. Actualizar en Figma los textos que usaban «terciario» y «éxito».
 6. T5b: con las llaves del Sandbox de Wompi en `.env`, repetir `npm run pruebas`.
+
+## T12 · Entrega (HT-01)
+
+- **Fecha:** 2026-11-18
+- **Alcance del plan:** «README con instrucciones de instalación paso a paso, capturas de la app, enlace del repositorio y guion del video». Además se completó HT-01 (integración continua) y se prepararon los insumos de la lista de la sección 15.
+- **Rama:** `tarea/T12-entrega`, primera tarea que no se hace sobre `main`.
+
+**Qué se construyó**
+
+- **Repositorio:**
+  - El equipo creó `josemina/RecargaMio`, configuró su identidad en git y subió `main`, con seis commits por componente que cubren de T0 a T11.
+  - Antes de esos commits se revisaron los 364 archivos: ningún secreto ni archivo ignorado. La única cadena con prefijo de producción es el ejemplo público de Wompi en una prueba; el equipo la aceptó como excepción.
+- **`npm run revisar:secretos`:** revisa los archivos que irían al repositorio. Las excepciones justificadas van en `tests/seguridad/secretos-aceptados.json`.
+- **Integración continua** (`.github/workflows/ci.yml`): secretos, lint, tipos y las pruebas de la API, del recaudo y de la app, con PostgreSQL como servicio.
+- **README de entrega:** instalación en siete pasos, capturas, resultados frente a la Tabla 9, comandos, documentación e insignia de la CI.
+- **`docs/entrega/`:**
+  - Guion del video minuto a minuto y lista de verificación para la grabación.
+  - Insumos del documento maestro: Tabla 17 diligenciada, párrafos por sprint, Figuras 7, 8 y 9, ajuste de la Tabla 18, resultados y Anexo E, también en Word (`npm run manual` genera los dos documentos).
+- **`npm run entrega:paquete`:** el `.zip` del Release con los Word, el PDF, `docs/metricas/` y los reportes. El Word del manual dejó de ir en el repositorio (decisión D).
+
+**Pruebas**
+
+- La integración continua se simuló en un contenedor Linux limpio, solo con los archivos del repositorio: `npm ci`, Prisma, lint y tipos sin errores, 249 de 249 (API) y 104 de 104 (app).
+- `npm run revisar:secretos` se probó con un archivo falso de cuenta de servicio: lo detecta y la corrida falla.
+
+**Decisiones (ADR 0020)**
+
+- **A.** El equipo crea el repositorio y hace los commits con su identidad; el trabajo va en ramas por tarea.
+- **B.** Integración continua con las pruebas rápidas; las de la Tabla 18 siguen locales.
+- **C.** Insumos del documento maestro en Word, con el mismo generador del manual.
+- **D.** En el repositorio, solo el PDF del manual; los Word y los reportes, en el Release.
+
+**Problemas encontrados**
+
+- **El documento maestro dice que TRL 5 y HT-03 requieren un despliegue «en la nube»**, pero T11 validó en un entorno local. Los insumos proponen un párrafo de ajuste; el equipo decide si lo usa o si despliega.
+- **La Tabla 18 nombra VoiceOver**, que es de iOS, fuera del PMV. Los insumos proponen las herramientas que se usaron.
+- **El primer intento de simular la CI falló por los archivos `._*`** que el `tar` de macOS agrega al empaquetar. No es un problema del repositorio: git no los sigue.
+- **Tokens en el reporte de Newman.** El reporte guarda las peticiones con el encabezado `Authorization`. Los 30 tokens ya habían vencido (duran 15 minutos), pero el Release puede ser público: el paquete ahora los oculta y verifica que no quede ningún valor secreto del `.env`.
+- **El patrón `entrega/` del `.gitignore` también excluía `docs/entrega/`.** Se corrigió a `/entrega/`, solo la carpeta de la raíz.
+- **Acceso del tutor:** en una cuenta personal de GitHub, un colaborador siempre recibe permiso de escritura. Para solo lectura, el repositorio debe estar en una organización o ser público.
+
+**Revisión del sprint con el tutor**
+
+[PENDIENTE: lo diligencia el equipo.]
+
+**Retrospectiva**
+
+[PENDIENTE: lo diligencia el equipo.]
+
+**Pendientes que deja T12 (equipo)**
+
+1. Revisar y fusionar el *pull request* de `tarea/T12-entrega` cuando la CI esté en verde, y proteger `main` (Settings → Branches).
+2. Dar acceso de lectura al tutor y poner el enlace del repositorio en el Anexo E.
+3. Decidir lo del despliegue en la nube y copiar los insumos al documento maestro.
+4. Grabar el video con `docs/entrega/guion-video.md` y poner su enlace en el Anexo E y en el README.
+5. Crear el Release con `npm run entrega:paquete`.
+6. Lo que sigue pendiente de T11 (teléfono, TalkBack, SUS y política de datos) y de T5b (Wompi Sandbox).
 

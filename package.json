@@ -23,7 +23,9 @@
     "demo:limpiar": "node scripts/demo.mjs limpiar",
     "registros": "node scripts/revisar-registros.mjs",
     "dependencias": "node scripts/auditar-dependencias.mjs",
-    "accesibilidad": "npm run accesibilidad --workspace apps/mobile"
+    "accesibilidad": "npm run accesibilidad --workspace apps/mobile",
+    "revisar:secretos": "node scripts/revisar-secretos.mjs",
+    "entrega:paquete": "node scripts/empaquetar-entrega.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",

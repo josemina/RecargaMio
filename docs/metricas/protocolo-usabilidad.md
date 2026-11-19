@@ -11,7 +11,7 @@ Prueba de usabilidad de la Tabla 18 del documento maestro: tareas de registro, r
 
 ## Consentimiento informado
 
-Antes de empezar, quien modera lee este texto y la persona firma en papel. Las hojas firmadas las guarda el equipo y **no se digitalizan ni se suben al repositorio**.
+Antes de empezar, quien modera lee este texto y la persona firma en papel el **consentimiento informado del Anexo D del documento maestro**, que cubre la prueba de usabilidad. Las hojas firmadas las guarda el equipo y **no se digitalizan ni se suben al repositorio**.
 
 > Te invitamos a probar RecargaMIO, un prototipo académico de la UNAD para recargar la tarjeta MIO desde el celular. Vas a hacer cuatro tareas cortas en un teléfono de prueba y después vas a responder un cuestionario de diez preguntas. Toma unos 20 minutos.
 >

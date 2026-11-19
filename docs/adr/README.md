@@ -21,3 +21,4 @@ Cada decisión técnica que no esté en el plan se pregunta al equipo y se regis
 - [ADR 0017 · Base de la app móvil: componentes de Figma, sesión segura y navegación](0017-base-de-la-app-movil.md)
 - [ADR 0018 · Pantallas de la app: vacíos entre Figma y la API](0018-pantallas-de-la-app.md)
 - [ADR 0019 · Validación TRL 5: entorno de pruebas, accesibilidad, MASVS y usabilidad](0019-validacion-trl5.md)
+- [ADR 0020 · Entrega: repositorio, integración continua, Release e insumos del documento maestro](0020-entrega.md)

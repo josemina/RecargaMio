@@ -387,3 +387,4 @@ Cada decisión que no estaba en el plan inicial se registra como ADR en `docs/ad
 | 0017 | Base de la app móvil: íconos SVG de Figma, sesión en el almacén seguro con renovación única, rutas protegidas y verificación del catálogo en la web |
 | 0018 | Pantallas de la app: datos de Nequi y PSE, términos de la pasarela, «Volver al inicio» en la 3.3, borrador de la política y diálogos |
 | 0019 | Validación TRL 5: entorno de pruebas local, participantes sin datos reales, accesibilidad en tres partes, SUS en papel y contraste con tokens existentes |
+| 0020 | Entrega: ramas por tarea y *pull request*, integración continua con GitHub Actions, revisión de secretos, Release con los Word y los reportes, e insumos del documento maestro |
