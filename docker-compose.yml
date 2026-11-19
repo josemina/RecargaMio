@@ -1,0 +1,150 @@
+# Entorno de desarrollo de RecargaMIO (sección 11 del plan).
+# Levantar: docker compose up -d   ·   Perfiles extra: webhooks, herramientas, pruebas
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: recargamio
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en .env}
+      POSTGRES_DB: recargamio
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/db/init:/docker-entrypoint-initdb.d:ro
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U recargamio"]
+      interval: 5s
+      retries: 10
+
+  recaudo-sim:
+    build:
+      context: .
+      dockerfile: services/recaudo-sim/Dockerfile
+      target: desarrollo
+    environment:
+      DATABASE_URL: postgresql://recargamio:${DB_PASSWORD}@db:5432/recaudo
+      DATABASE_URL_PRUEBAS: postgresql://recargamio:${DB_PASSWORD}@db:5432/recaudo_pruebas
+      PRISMA_HIDE_UPDATE_MESSAGE: "1"
+      RECAUDO_API_KEY: ${RECAUDO_API_KEY:?Falta RECAUDO_API_KEY en .env}
+      # Aviso de cada viaje para las alertas de saldo bajo (T6, ADR 0014)
+      API_AVISOS_URL: http://api:3000/internos/recaudo/viajes
+    depends_on: { db: { condition: service_healthy } }
+    ports: ["4000:4000"]
+    volumes:
+      - ./services/recaudo-sim/src:/app/services/recaudo-sim/src
+      - ./services/recaudo-sim/tests:/app/services/recaudo-sim/tests
+      - ./services/recaudo-sim/prisma:/app/services/recaudo-sim/prisma
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      retries: 10
+      start_period: 30s
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+      target: desarrollo
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://recargamio:${DB_PASSWORD}@db:5432/recargamio
+      DATABASE_URL_PRUEBAS: postgresql://recargamio:${DB_PASSWORD}@db:5432/recargamio_pruebas
+      PRISMA_HIDE_UPDATE_MESSAGE: "1"
+      RECAUDO_URL: http://recaudo-sim:4000
+      # FCM (T6): si el archivo no existe, los avisos quedan solo en la bandeja de la app
+      FIREBASE_CREDENCIALES_JSON: /app/secrets/firebase.json
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      # 'desactivados' solo mientras corre «npm run pruebas» (T8, ADR 0016)
+      LIMITES_PETICIONES: ${LIMITES_PETICIONES:-normal}
+    depends_on:
+      db: { condition: service_healthy }
+      recaudo-sim: { condition: service_healthy }
+    ports: ["3000:3000"]
+    volumes:
+      - ./services/api/src:/app/services/api/src
+      - ./services/api/tests:/app/services/api/tests
+      - ./services/api/prisma:/app/services/api/prisma
+      - ./services/api/openapi.yaml:/app/services/api/openapi.yaml:ro
+      - ./secrets:/app/secrets:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      retries: 5
+      start_period: 10s
+
+  mailpit:
+    image: axllent/mailpit
+    ports: ["8025:8025", "1025:1025"]
+
+  tunel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate --url http://api:3000
+    depends_on: [api]
+    profiles: ["webhooks"]
+
+  adminer:
+    image: adminer
+    ports: ["8080:8080"]
+    profiles: ["herramientas"]
+
+  # ── Perfil «app» (T9, decisión D5): lint, tipos y pruebas de la app móvil. La app corre en el equipo, no en Docker. ──
+  app-pruebas:
+    build:
+      context: .
+      dockerfile: apps/mobile/Dockerfile
+    profiles: ["app"]
+
+  # ── Perfil «pruebas» (T8, ADR 0016). Lo más fácil es correrlos todos con «npm run pruebas». ──
+  # Las imágenes tienen versión fija para que los resultados se puedan repetir.
+  newman:
+    image: postman/newman:6.1.3-alpine
+    volumes: ["./tests/postman:/etc/newman"]
+    command: >-
+      run RecargaMIO.postman_collection.json --env-var baseUrl=http://api:3000
+      --reporters cli,junit,json
+      --reporter-junit-export reportes/newman-junit.xml
+      --reporter-json-export reportes/newman.json
+    depends_on: { api: { condition: service_healthy } }
+    profiles: ["pruebas"]
+
+  recargas:
+    image: node:22-alpine
+    volumes:
+      - ./tests/integracion:/pruebas:ro
+      - ./docs/metricas/datos:/datos
+    environment:
+      BASE_URL: http://api:3000
+      PRUEBAS_CONTRASENA: ${PRUEBAS_CONTRASENA:-}
+      TOTAL: ${RECARGAS_TOTAL:-200}
+      CONCURRENCIA: ${RECARGAS_CONCURRENCIA:-5}
+    command: node /pruebas/recargas.mjs
+    depends_on: { api: { condition: service_healthy } }
+    profiles: ["pruebas"]
+
+  jmeter:
+    image: alpine/jmeter:5.6.3
+    volumes: ["./tests/jmeter:/tests"]
+    command: >-
+      -n -f -t /tests/recargas.jmx -l /tests/reportes/resultados.jtl -e -o /tests/reportes/html
+      -Jhost=api -Jport=3000 -Jclave=${PRUEBAS_CONTRASENA:-}
+      -Jusuarios=${JMETER_USUARIOS:-100} -Jrampa=${JMETER_RAMPA:-20} -Jiteraciones=${JMETER_ITERACIONES:-5}
+    depends_on: { api: { condition: service_healthy } }
+    profiles: ["pruebas"]
+
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:2.16.1
+    volumes: ["./tests/seguridad:/zap/wrk"]
+    environment:
+      # Escaneo con sesión: el token del usuario zap@recargamio.test lo pone «npm run pruebas» en ZAP_TOKEN
+      ZAP_AUTH_HEADER: Authorization
+      ZAP_AUTH_HEADER_VALUE: Bearer ${ZAP_TOKEN:-sin-token}
+      ZAP_AUTH_HEADER_SITE: api
+    command: >-
+      zap-api-scan.py -t http://api:3000/docs/openapi.json -f openapi -c reglas-zap.conf -I
+      -r reportes/zap.html -J reportes/zap.json -w reportes/zap.md
+    depends_on: { api: { condition: service_healthy } }
+    profiles: ["pruebas"]
+
+volumes:
+  pgdata:

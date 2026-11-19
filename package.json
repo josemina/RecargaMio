@@ -1,0 +1,35 @@
+{
+  "name": "recargamio",
+  "private": true,
+  "description": "Prototipo académico (UNAD) para recargar la tarjeta MIO de Cali en modo de pruebas.",
+  "workspaces": [
+    "apps/*",
+    "services/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "eslint . && npm run lint --workspace apps/mobile",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm test --workspaces --if-present",
+    "manual": "npm --prefix docs/manual/generador install --no-audit --no-fund --silent && npm --prefix docs/manual/generador run generar",
+    "manual:capturas": "npm --prefix docs/manual/generador install --no-audit --no-fund --silent && npm --prefix docs/manual/generador run capturas",
+    "pruebas": "node scripts/pruebas.mjs",
+    "prueba:recargas": "node scripts/pruebas.mjs recargas",
+    "metricas": "node scripts/metricas.mjs",
+    "demo": "node scripts/demo.mjs",
+    "demo:exportar": "node scripts/demo.mjs exportar",
+    "demo:limpiar": "node scripts/demo.mjs limpiar",
+    "registros": "node scripts/revisar-registros.mjs",
+    "dependencias": "node scripts/auditar-dependencias.mjs",
+    "accesibilidad": "npm run accesibilidad --workspace apps/mobile"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.0",
+    "eslint": "^10.0.0",
+    "globals": "^16.0.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.0"
+  }
+}

@@ -1,0 +1,29 @@
+# Dependencias y compilados
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Secretos: nunca al repositorio (regla 1 de CLAUDE.md)
+.env
+.env.*
+!.env.example
+secrets/
+
+# Reportes completos generados por las pruebas (T8, ADR 0016): pesan y cambian en cada corrida.
+# Se sube el resumen docs/metricas/resultados.md; los reportes de la corrida final van a un Release de GitHub.
+tests/postman/reportes/
+tests/jmeter/reportes/
+tests/seguridad/reportes/
+tests/seguridad/zap.yaml
+
+# Sistema operativo y editores
+.DS_Store
+.vscode/
+.idea/
+
+# Clientes de Prisma generados
+services/*/generated/
+
+# Archivo intermedio del generador del manual
+docs/manual/entregables/manual.html
