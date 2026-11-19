@@ -1,0 +1,6 @@
+{
+  "replaceAttrValues": { "#1B1F2A": "currentColor" },
+  "svgoConfig": {
+    "plugins": [{ "name": "removeAttrs", "params": { "attrs": ["svg:style"] } }]
+  }
+}

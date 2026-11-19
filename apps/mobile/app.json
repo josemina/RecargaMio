@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "RecargaMIO",
+    "slug": "recargamio",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "co.edu.unad.recargamio"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0B3D91",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "co.edu.unad.recargamio"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-secure-store",
+      "expo-splash-screen",
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "color": "#0B3D91"
+        }
+      ]
+    ],
+    "scheme": "recargamio",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

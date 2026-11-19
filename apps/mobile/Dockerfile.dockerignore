@@ -1,0 +1,13 @@
+# Contexto de la imagen de pruebas de la app (apps/mobile/Dockerfile): a diferencia de los servicios, sí incluye apps/mobile.
+**/node_modules
+**/dist
+**/.expo
+.git
+.env
+.env.*
+!.env.example
+secrets
+docs
+tests
+services/*/src
+services/*/tests
