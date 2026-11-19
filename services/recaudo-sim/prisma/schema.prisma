@@ -1,0 +1,55 @@
+// Esquema de la base `recaudo`: emula los datos del sistema de recaudo del MIO (sección 8 del plan).
+// El cliente se genera en una carpeta propia para no chocar con el de la API en el monorepo.
+
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../generated/prisma"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Tarjeta MIO tal como la conoce el recaudo. El saldo puede quedar negativo tras un viaje (ADR 0010).
+model TarjetaRecaudo {
+  numero   String   @id
+  saldo    Int
+  activa   Boolean  @default(true)
+  creadaEn DateTime @default(now()) @map("creada_en")
+
+  creditos Credito[]
+  viajes   Viaje[]
+
+  @@map("tarjeta_recaudo")
+}
+
+/// Crédito (recarga acreditada). La referencia única garantiza la idempotencia.
+model Credito {
+  id              String   @id @default(uuid())
+  referencia      String   @unique
+  numero          String
+  monto           Int
+  saldoResultante Int      @map("saldo_resultante")
+  acreditadoEn    DateTime @default(now()) @map("acreditado_en")
+
+  tarjeta TarjetaRecaudo @relation(fields: [numero], references: [numero])
+
+  @@index([numero])
+  @@map("credito")
+}
+
+/// Viaje (validación en un bus o estación). Descuenta el valor del pasaje.
+model Viaje {
+  id     String   @id @default(uuid())
+  numero String
+  valor  Int
+  ruta   String
+  fecha  DateTime @default(now())
+
+  tarjeta TarjetaRecaudo @relation(fields: [numero], references: [numero])
+
+  @@index([numero, fecha])
+  @@map("viaje")
+}

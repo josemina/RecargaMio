@@ -1,0 +1,47 @@
+{
+  "name": "@recargamio/recaudo-sim",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Simulador del sistema de recaudo del MIO (UTRYT) para pruebas.",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "iniciar:dev": "prisma migrate deploy && npm run seed && npm run dev",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/server.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "jest --runInBand",
+    "prisma:generate": "prisma generate",
+    "migrar": "prisma migrate deploy",
+    "seed": "tsx prisma/seed.ts",
+    "validacion:reiniciar": "tsx prisma/reiniciar-validacion.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "pino": "^9.7.0",
+    "pino-http": "^10.5.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.18.0",
+    "@types/supertest": "^6.0.3",
+    "jest": "^30.2.0",
+    "prisma": "^6.19.3",
+    "supertest": "^7.1.4",
+    "ts-jest": "^29.4.5",
+    "tsx": "^4.20.0",
+    "typescript": "~5.9.3"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": [
+      "<rootDir>/tests"
+    ],
+    "globalSetup": "<rootDir>/tests/preparar-base.ts"
+  }
+}
