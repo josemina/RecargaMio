@@ -1,0 +1,1021 @@
+# Contrato de la API de RecargaMIO (T8, ADR 0016).
+# Se escribe a mano: la prueba tests/openapi.test.ts falla si una ruta de Express no está aquí, o si algo de aquí no existe.
+# Se publica en /docs (Swagger UI) y /docs/openapi.json solo fuera de producción.
+openapi: 3.1.0
+info:
+  title: API de RecargaMIO
+  version: 0.8.0
+  summary: Recarga de la tarjeta MIO de Cali con PSE, Nequi y Bancolombia en modo de pruebas.
+  description: |
+    Prototipo académico (UNAD, proyecto de grado). **Nunca se mueve dinero real:** la pasarela es Wompi Sandbox
+    o una pasarela simulada con los mismos datos de prueba.
+
+    - Todos los errores tienen la forma `{ "error": { "codigo", "mensaje", ...datos } }`.
+    - Las rutas privadas exigen `Authorization: Bearer <tokenAcceso>` (15 minutos). El token se renueva con `POST /auth/renovar`.
+    - Los montos se expresan en pesos colombianos enteros (sin centavos).
+    - La API nunca devuelve el número completo de una tarjeta MIO ni datos bancarios: solo los últimos 4 dígitos.
+  license:
+    name: Uso académico
+servers:
+  - url: http://localhost:3000
+    description: Docker Compose en el equipo local
+tags:
+  - name: Estado
+  - name: Autenticación
+    description: Registro, ingreso, sesión y recuperación de la contraseña (HU-06).
+  - name: Perfil
+    description: Datos del usuario y eliminación de la cuenta (T7, Ley 1581 de 2012).
+  - name: Tarjetas
+    description: Tarjetas MIO, saldo, movimientos y alerta de saldo bajo (HU-03, HU-05, HU-07).
+  - name: Recargas
+    description: Recarga de una tarjeta propia o de otra persona (HU-01, HU-02, HU-04).
+  - name: Pasarela
+    description: Datos de la pasarela de pagos para la pantalla 3.1 y páginas de la pasarela simulada.
+  - name: Notificaciones
+    description: Bandeja de avisos y registro del teléfono para push (HU-05).
+  - name: Integraciones
+    description: Llamadas de otros sistemas (Wompi y el recaudo del MIO). La app no las usa.
+
+security:
+  - bearer: []
+
+paths:
+  /health:
+    get:
+      tags: [Estado]
+      summary: Estado de la API y de la base de datos
+      security: []
+      responses:
+        '200':
+          description: La API y la base responden.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Salud' }
+              example: { estado: ok, servicio: api, baseDatos: ok }
+        '503':
+          description: La base de datos no responde.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Salud' }
+
+  # ───────────────────────── Autenticación ─────────────────────────
+  /auth/registro:
+    post:
+      tags: [Autenticación]
+      summary: Crear una cuenta (HU-06 CA-1 y CA-2, pantalla 1.3)
+      description: Exige `aceptaPolitica = true` (Ley 1581 de 2012). Se registra la versión de la política aceptada.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nombre, correo, contrasena, aceptaPolitica]
+              properties:
+                nombre: { type: string, minLength: 3, maxLength: 80, example: Ana Prueba }
+                correo: { type: string, format: email, maxLength: 254, example: ana@recargamio.test }
+                contrasena: { $ref: '#/components/schemas/ContrasenaNueva' }
+                aceptaPolitica: { type: boolean, const: true }
+      responses:
+        '201':
+          description: Cuenta creada y sesión abierta.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sesion' }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+        '429': { $ref: '#/components/responses/DemasiadasPeticiones' }
+  /auth/ingreso:
+    post:
+      tags: [Autenticación]
+      summary: Ingresar con correo y contraseña (HU-06 CA-3 y CA-4, pantalla 1.2)
+      description: Tras 5 intentos fallidos, el ingreso se bloquea 15 minutos (423 `CUENTA_BLOQUEADA`).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [correo, contrasena]
+              properties:
+                correo: { type: string, format: email, example: ana@recargamio.test }
+                contrasena: { type: string, minLength: 1, maxLength: 128, format: password }
+      responses:
+        '200':
+          description: Sesión abierta.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sesion' }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '401':
+          description: '`CREDENCIALES_INVALIDAS`, con `intentosRestantes` cuando el correo existe.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '423':
+          description: '`CUENTA_BLOQUEADA`, con `desbloqueoEn`.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/DemasiadasPeticiones' }
+  /auth/renovar:
+    post:
+      tags: [Autenticación]
+      summary: Renovar el token de acceso
+      description: El token de renovación se usa una sola vez y se cambia por uno nuevo (rotación).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TokenRenovacion' }
+      responses:
+        '200':
+          description: Tokens nuevos.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tokens' }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '429': { $ref: '#/components/responses/DemasiadasPeticiones' }
+  /auth/salir:
+    post:
+      tags: [Autenticación]
+      summary: Cerrar la sesión
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TokenRenovacion' }
+      responses:
+        '204': { description: Sesión cerrada. Los tokens de acceso de esa sesión dejan de servir de inmediato. }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+  /auth/recuperar:
+    post:
+      tags: [Autenticación]
+      summary: Pedir el enlace para restablecer la contraseña (pantalla 1.4)
+      description: Responde lo mismo exista o no el correo, para no revelar qué cuentas existen.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [correo]
+              properties:
+                correo: { type: string, format: email }
+      responses:
+        '200':
+          description: Mensaje genérico.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Mensaje' }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '429': { $ref: '#/components/responses/DemasiadasPeticiones' }
+  /auth/restablecer:
+    post:
+      tags: [Autenticación]
+      summary: Restablecer la contraseña con el token del correo
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, contrasena]
+              properties:
+                token: { type: string, pattern: '^[A-Za-z0-9_-]{20,100}$' }
+                contrasena: { $ref: '#/components/schemas/ContrasenaNueva' }
+      responses:
+        '200':
+          description: Contraseña cambiada. Se cierran todas las sesiones.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Mensaje' }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '429': { $ref: '#/components/responses/DemasiadasPeticiones' }
+  /restablecer:
+    get:
+      tags: [Autenticación]
+      summary: Página web del enlace del correo de recuperación
+      security: []
+      parameters:
+        - { name: token, in: query, required: false, schema: { type: string } }
+      responses:
+        '200':
+          description: Formulario HTML.
+          content:
+            text/html:
+              schema: { type: string }
+    post:
+      tags: [Autenticación]
+      summary: Envío del formulario web de restablecimiento
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [token, contrasena, confirmacion]
+              properties:
+                token: { type: string }
+                contrasena: { type: string, format: password }
+                confirmacion: { type: string, format: password }
+      responses:
+        '200':
+          description: Página de éxito.
+          content:
+            text/html:
+              schema: { type: string }
+        '400':
+          description: Página con el error de validación.
+          content:
+            text/html:
+              schema: { type: string }
+
+  # ───────────────────────── Perfil ─────────────────────────
+  /me:
+    get:
+      tags: [Perfil]
+      summary: Datos del usuario (pantalla 5.1)
+      responses:
+        '200':
+          description: Perfil.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Perfil' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    patch:
+      tags: [Perfil]
+      summary: Actualizar o rectificar los datos (pantalla 5.2)
+      description: Cambiar el correo exige `contrasenaActual`, y se avisa al correo anterior.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                nombre: { type: string, minLength: 3, maxLength: 80 }
+                correo: { type: string, format: email }
+                contrasenaActual: { type: string, format: password }
+      responses:
+        '200':
+          description: Perfil actualizado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Perfil' }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/ContrasenaIncorrecta' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+    delete:
+      tags: [Perfil]
+      summary: Eliminar la cuenta (pantalla 5.2, ADR 0015)
+      description: |
+        Borra tarjetas, alertas, notificaciones y dispositivos; anonimiza el usuario y conserva las recargas
+        con el número reducido a `••••1234`. Responde 409 `RECARGA_EN_CURSO` si hay dinero en camino.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contrasena]
+              properties:
+                contrasena: { type: string, format: password }
+      responses:
+        '200':
+          description: Cuenta eliminada.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  eliminada: { type: boolean, const: true }
+                  tarjetas: { type: integer }
+                  recargasAnonimizadas: { type: integer }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '403': { $ref: '#/components/responses/ContrasenaIncorrecta' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+
+  # ───────────────────────── Tarjetas ─────────────────────────
+  /tarjetas:
+    get:
+      tags: [Tarjetas]
+      summary: Tarjetas del usuario con su saldo (HU-03 CA-1, pantalla 2.1)
+      responses:
+        '200':
+          description: Lista de tarjetas. Si el recaudo no responde, `saldo` es nulo y llega un `aviso`.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  registradas: { type: integer }
+                  maximo: { type: integer, example: 5 }
+                  recaudoDisponible: { type: boolean }
+                  aviso: { type: string }
+                  tarjetas:
+                    type: array
+                    items: { $ref: '#/components/schemas/Tarjeta' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    post:
+      tags: [Tarjetas]
+      summary: Agregar una tarjeta (HU-07 CA-1 y CA-3, pantalla 2.2)
+      description: Máximo 5 tarjetas activas (409 `LIMITE_TARJETAS`). La tarjeta debe existir y estar activa en el recaudo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [numero, alias]
+              properties:
+                numero: { type: string, description: 10 dígitos; se aceptan espacios y guiones, example: '1234 5648 21' }
+                alias: { $ref: '#/components/schemas/Alias' }
+      responses:
+        '201':
+          description: Tarjeta agregada.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tarjeta: { $ref: '#/components/schemas/Tarjeta' }
+                  registradas: { type: integer }
+                  maximo: { type: integer }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+        '422': { $ref: '#/components/responses/TarjetaNoValida' }
+        '503': { $ref: '#/components/responses/RecaudoNoDisponible' }
+  /tarjetas/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdTarjeta'
+    get:
+      tags: [Tarjetas]
+      summary: Detalle de una tarjeta (pantalla 2.3)
+      responses:
+        '200':
+          description: Detalle con la última recarga acreditada.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Tarjeta'
+                  - type: object
+                    properties:
+                      ultimaRecarga:
+                        type: [object, 'null']
+                        properties:
+                          fecha: { type: string, format: date-time }
+                          monto: { type: integer }
+                          medioPago: { type: string }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    patch:
+      tags: [Tarjetas]
+      summary: Cambiar el nombre de la tarjeta (HU-07 CA-4)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [alias]
+              properties:
+                alias: { $ref: '#/components/schemas/Alias' }
+      responses:
+        '200':
+          description: Tarjeta con el nombre nuevo.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tarjeta' }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+    delete:
+      tags: [Tarjetas]
+      summary: Eliminar la tarjeta de la cuenta (HU-07 CA-4)
+      description: Borrado lógico; el historial de recargas se conserva.
+      responses:
+        '204': { description: Tarjeta eliminada. }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+  /tarjetas/{id}/movimientos:
+    parameters:
+      - $ref: '#/components/parameters/IdTarjeta'
+    get:
+      tags: [Tarjetas]
+      summary: Historial de recargas y viajes (HU-03 CA-2 y CA-3, pantalla 2.3)
+      parameters:
+        - { name: tipo, in: query, schema: { type: string, enum: [todo, recargas, viajes], default: todo } }
+        - { name: limite, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: antesDe, in: query, description: Cursor de la página siguiente, schema: { type: string, format: date-time } }
+      responses:
+        '200':
+          description: Movimientos del más reciente al más antiguo.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tarjeta:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      alias: { type: string }
+                      ultimos4: { type: string }
+                  tipo: { type: string }
+                  movimientos:
+                    type: array
+                    items: { $ref: '#/components/schemas/Movimiento' }
+                  siguienteCursor: { type: [string, 'null'], format: date-time }
+                  aviso: { type: string }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+  /tarjetas/{id}/alerta:
+    parameters:
+      - $ref: '#/components/parameters/IdTarjeta'
+    put:
+      tags: [Tarjetas]
+      summary: Configurar o desactivar la alerta de saldo bajo (HU-05 CA-1 y CA-4, pantalla 4.2)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Alerta' }
+      responses:
+        '200':
+          description: Detalle de la tarjeta con la alerta nueva.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tarjeta' }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  # ───────────────────────── Recargas ─────────────────────────
+  /recargas:
+    post:
+      tags: [Recargas]
+      summary: Iniciar una recarga (HU-01, HU-02 y HU-04, pantallas 3.1 a 3.3)
+      description: |
+        Crea la recarga `PENDIENTE` e inicia el pago en la pasarela. El saldo solo se acredita cuando la pasarela
+        confirma `APPROVED` (webhook verificado o reconciliación). Los datos del medio de pago no se guardan.
+
+        Datos de prueba: Nequi `3991111111` aprueba y `3992222222` rechaza; PSE banco `1` aprueba y `2` rechaza.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SolicitudRecarga' }
+            examples:
+              nequi:
+                summary: Nequi a una tarjeta propia
+                value: { tarjetaId: 3f1b0c7e-0000-4000-8000-000000000001, monto: 20000, medioPago: NEQUI, datosMedio: { celular: '3991111111' }, aceptaTerminosPasarela: true }
+              tercero:
+                summary: PSE a la tarjeta de otra persona
+                value:
+                  numeroDestino: '9087654321'
+                  confirmacionNumero: '9087654321'
+                  monto: 10000
+                  medioPago: PSE
+                  datosMedio: { tipoPersona: NATURAL, tipoDocumento: CC, numeroDocumento: '1234567890', codigoBanco: '1', celular: '3001234567' }
+                  aceptaTerminosPasarela: true
+      responses:
+        '201':
+          description: Recarga creada. Con PSE y Bancolombia, `urlPago` es la página del banco.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Recarga' }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+        '409': { $ref: '#/components/responses/Conflicto' }
+        '422': { $ref: '#/components/responses/TarjetaNoValida' }
+        '502':
+          description: '`PASARELA_NO_DISPONIBLE`: no se hizo ningún cobro.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503': { $ref: '#/components/responses/RecaudoNoDisponible' }
+  /recargas/{id}:
+    get:
+      tags: [Recargas]
+      summary: Estado de una recarga (pantallas 3.3 a 3.5)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: actualizar, in: query, description: Con `1`, consulta la pasarela («Actualizar estado»), schema: { type: string, enum: ['1', 'true'] } }
+      responses:
+        '200':
+          description: Recarga.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Recarga' }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  # ───────────────────────── Pasarela ─────────────────────────
+  /pasarela/bancos:
+    get:
+      tags: [Pasarela]
+      summary: Bancos de PSE
+      responses:
+        '200':
+          description: Lista de bancos.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bancos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        codigo: { type: string }
+                        nombre: { type: string }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+  /pasarela/terminos:
+    get:
+      tags: [Pasarela]
+      summary: Enlaces a los términos y a la autorización de datos de la pasarela
+      responses:
+        '200':
+          description: Enlaces que la app muestra antes de pagar.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pasarela: { type: string, enum: [simulada, wompi] }
+                  aceptacion: { type: string, format: uri }
+                  datosPersonales: { type: string, format: uri }
+                  tokenAceptacion: { type: string }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+  /pasarela-simulada/banco/{id}:
+    get:
+      tags: [Pasarela]
+      summary: Página del «banco» de la pasarela simulada (solo con PASARELA=simulada)
+      security: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Página HTML.
+          content:
+            text/html:
+              schema: { type: string }
+  /pasarela-simulada/terminos:
+    get:
+      tags: [Pasarela]
+      summary: Términos de la pasarela simulada
+      security: []
+      responses:
+        '200':
+          description: Página HTML.
+          content:
+            text/html:
+              schema: { type: string }
+  /pasarela-simulada/datos-personales:
+    get:
+      tags: [Pasarela]
+      summary: Autorización de datos de la pasarela simulada
+      security: []
+      responses:
+        '200':
+          description: Página HTML.
+          content:
+            text/html:
+              schema: { type: string }
+
+  # ───────────────────────── Notificaciones ─────────────────────────
+  /dispositivos:
+    post:
+      tags: [Notificaciones]
+      summary: Registrar el token de FCM del teléfono
+      description: El token va en el cuerpo y no en la URL, para que no quede en los registros.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string, minLength: 20, maxLength: 4096, pattern: '^[\w:-]+$' }
+                plataforma: { type: string, enum: [android], default: android }
+      responses:
+        '201':
+          description: Teléfono registrado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  registrado: { type: boolean }
+                  envioPush: { type: boolean, description: Falso si el servidor no tiene FCM configurado }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+    delete:
+      tags: [Notificaciones]
+      summary: Quitar el token del teléfono (al cerrar sesión)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        '204': { description: Token quitado. }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+  /notificaciones:
+    get:
+      tags: [Notificaciones]
+      summary: Bandeja de avisos (campana de la pantalla 2.1)
+      parameters:
+        - { name: limite, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+        - { name: soloNoLeidas, in: query, schema: { type: string, enum: ['1', 'true'] } }
+      responses:
+        '200':
+          description: Avisos del más reciente al más antiguo.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  noLeidas: { type: integer }
+                  notificaciones:
+                    type: array
+                    items: { $ref: '#/components/schemas/Notificacion' }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+  /notificaciones/leidas:
+    post:
+      tags: [Notificaciones]
+      summary: Marcar todos los avisos como leídos
+      responses:
+        '200':
+          description: Cantidad marcada.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  marcadas: { type: integer }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+  /notificaciones/{id}/leida:
+    post:
+      tags: [Notificaciones]
+      summary: Marcar un aviso como leído
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Aviso marcado. }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '401': { $ref: '#/components/responses/NoAutenticado' }
+        '404': { $ref: '#/components/responses/NoEncontrado' }
+
+  # ───────────────────────── Integraciones ─────────────────────────
+  /webhooks/wompi:
+    post:
+      tags: [Integraciones]
+      summary: Eventos de la pasarela (Wompi)
+      description: |
+        Antes de leer el evento se verifica `X-Event-Checksum`: SHA256 de los valores de `signature.properties`,
+        más `timestamp` y el secreto de eventos. Si no coincide, responde 401 `FIRMA_INVALIDA`.
+        Solo se procesan eventos `transaction.updated` del entorno `test`.
+      security: []
+      parameters:
+        - { name: X-Event-Checksum, in: header, required: true, schema: { type: string, pattern: '^[0-9A-Fa-f]{64}$' } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EventoWompi' }
+      responses:
+        '200':
+          description: Evento recibido.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recibido: { type: boolean }
+                  procesado: { type: boolean }
+        '400':
+          description: '`EVENTO_INVALIDO`: el cuerpo no es JSON.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: '`FIRMA_INVALIDA`.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /internos/recaudo/viajes:
+    post:
+      tags: [Integraciones]
+      summary: Aviso del recaudo después de cada viaje (alertas de saldo bajo, ADR 0014)
+      security:
+        - llaveRecaudo: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [numero]
+              properties:
+                numero: { type: string, pattern: '^\d{10}$' }
+      responses:
+        '200':
+          description: Alertas revisadas.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  revisadas: { type: integer }
+                  avisos: { type: integer }
+                  sinSaldo: { type: integer }
+        '400': { $ref: '#/components/responses/DatosInvalidos' }
+        '401':
+          description: '`NO_AUTORIZADO`: falta la llave del recaudo o no es válida.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token de acceso de `POST /auth/ingreso` o `POST /auth/registro`. Dura 15 minutos.
+    llaveRecaudo:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: Llave compartida entre el recaudo simulado y la API.
+
+  parameters:
+    IdTarjeta:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    DatosInvalidos:
+      description: '`DATOS_INVALIDOS` (con `campos`) u otro error de validación de la regla de negocio.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { codigo: DATOS_INVALIDOS, mensaje: Escribe un correo electrónico válido., campos: [correo] } }
+    NoAutenticado:
+      description: '`NO_AUTENTICADO`, `SESION_INVALIDA`, `TOKEN_EXPIRADO` o `TOKEN_INVALIDO`.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ContrasenaIncorrecta:
+      description: '`CONTRASENA_INCORRECTA`.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NoEncontrado:
+      description: '`TARJETA_NO_ENCONTRADA`, `RECARGA_NO_ENCONTRADA`, `NOTIFICACION_NO_ENCONTRADA` o `USUARIO_NO_EXISTE`.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflicto:
+      description: '`CORREO_REGISTRADO`, `LIMITE_TARJETAS`, `TARJETA_YA_REGISTRADA` o `RECARGA_EN_CURSO`.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TarjetaNoValida:
+      description: '`TARJETA_NO_EXISTE` o `TARJETA_INACTIVA` en el recaudo.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    RecaudoNoDisponible:
+      description: '`RECAUDO_NO_DISPONIBLE`.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    DemasiadasPeticiones:
+      description: '`DEMASIADAS_PETICIONES`: límite por IP.'
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [codigo, mensaje]
+          properties:
+            codigo: { type: string, example: DATOS_INVALIDOS }
+            mensaje: { type: string }
+            campos: { type: array, items: { type: string } }
+          additionalProperties: true
+    Mensaje:
+      type: object
+      properties:
+        mensaje: { type: string }
+    Salud:
+      type: object
+      properties:
+        estado: { type: string, enum: [ok, degradado] }
+        servicio: { type: string }
+        baseDatos: { type: string }
+    ContrasenaNueva:
+      type: string
+      format: password
+      minLength: 8
+      maxLength: 128
+      description: Mínimo 8 caracteres, con al menos una letra y un número.
+    Alias:
+      type: string
+      minLength: 1
+      maxLength: 30
+      example: Mi tarjeta
+    TokenRenovacion:
+      type: object
+      required: [tokenRenovacion]
+      properties:
+        tokenRenovacion: { type: string, pattern: '^[A-Za-z0-9_-]{20,100}$' }
+    Tokens:
+      type: object
+      properties:
+        tokenAcceso: { type: string }
+        accesoExpiraEn: { type: string, format: date-time }
+        tokenRenovacion: { type: string }
+        sesionExpiraEn: { type: string, format: date-time }
+    Sesion:
+      allOf:
+        - $ref: '#/components/schemas/Tokens'
+        - type: object
+          properties:
+            usuario:
+              type: object
+              properties:
+                id: { type: string, format: uuid }
+                nombre: { type: string }
+                correo: { type: string, format: email }
+    Perfil:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        correo: { type: string, format: email }
+        creadoEn: { type: string, format: date-time }
+        politica:
+          type: [object, 'null']
+          properties:
+            version: { type: string, example: '1.0' }
+            aceptadaEn: { type: string, format: date-time }
+    Alerta:
+      type: object
+      required: [umbral]
+      properties:
+        umbral: { type: integer, minimum: 3500, maximum: 50000, example: 5000 }
+        activa: { type: boolean, default: true }
+    Tarjeta:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        alias: { type: string }
+        ultimos4: { type: string, example: '4821' }
+        saldo: { type: [integer, 'null'], description: Nulo si el recaudo no respondió }
+        saldoBajo: { type: boolean }
+        alerta:
+          oneOf:
+            - $ref: '#/components/schemas/Alerta'
+            - type: 'null'
+        creadaEn: { type: string, format: date-time }
+    Movimiento:
+      type: object
+      properties:
+        tipo: { type: string, enum: [RECARGA, VIAJE] }
+        fecha: { type: string, format: date-time }
+        valor: { type: integer, description: Positivo en recargas y negativo en viajes }
+        descripcion: { type: string }
+        referencia: { type: string }
+    SolicitudRecarga:
+      type: object
+      required: [monto, medioPago, aceptaTerminosPasarela]
+      description: Se envía `tarjetaId` (tarjeta propia) o `numeroDestino` + `confirmacionNumero` (otra persona), nunca ambos.
+      properties:
+        tarjetaId: { type: string, format: uuid }
+        numeroDestino: { type: string, description: 10 dígitos }
+        confirmacionNumero: { type: string }
+        guardarTarjeta: { type: boolean, default: false }
+        aliasTarjeta: { type: string, maxLength: 30 }
+        monto: { type: integer, enum: [5000, 10000, 20000, 50000] }
+        medioPago: { type: string, enum: [NEQUI, PSE, BANCOLOMBIA_TRANSFER] }
+        datosMedio:
+          oneOf:
+            - title: Nequi
+              type: object
+              required: [celular]
+              properties:
+                celular: { type: string, pattern: '^3\d{9}$' }
+            - title: PSE
+              type: object
+              required: [tipoPersona, tipoDocumento, numeroDocumento, codigoBanco, celular]
+              properties:
+                tipoPersona: { type: string, enum: [NATURAL, JURIDICA] }
+                tipoDocumento: { type: string, enum: [CC, CE, NIT, PP, TI] }
+                numeroDocumento: { type: string, pattern: '^[0-9A-Za-z]{5,15}$' }
+                codigoBanco: { type: string }
+                celular: { type: string, pattern: '^3\d{9}$' }
+            - title: Bancolombia
+              type: object
+        aceptaTerminosPasarela: { type: boolean, const: true }
+    Recarga:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        referencia: { type: string, example: RM-20261118-000123 }
+        estado: { type: string, enum: [PENDIENTE, APROBADA, ACREDITADA, RECHAZADA, ERROR, FALLA_ACREDITACION] }
+        mensaje: { type: string }
+        monto: { type: integer }
+        total: { type: integer }
+        medioPago: { type: string, example: Nequi }
+        destino:
+          type: object
+          properties:
+            ultimos4: { type: string }
+            alias: { type: [string, 'null'] }
+            tercero: { type: boolean }
+        urlPago: { type: [string, 'null'], format: uri }
+        motivo: { type: [string, 'null'] }
+        iniciadaEn: { type: string, format: date-time }
+        confirmadaEn: { type: [string, 'null'], format: date-time }
+        acreditadaEn: { type: [string, 'null'], format: date-time }
+        tiempoSegundos: { type: [number, 'null'], description: acreditadaEn − iniciadaEn (meta ≤ 180 s) }
+        comprobante:
+          type: [object, 'null']
+          properties:
+            referencia: { type: string }
+            fecha: { type: string, format: date-time }
+            medioPago: { type: string }
+            monto: { type: integer }
+            nuevoSaldo: { type: [integer, 'null'] }
+            tarjeta: { type: string, example: MIO •••• 4821 }
+    Notificacion:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tipo: { type: string, enum: [SALDO_BAJO, RECARGA_EXITOSA] }
+        titulo: { type: string }
+        cuerpo: { type: string }
+        datos: { type: object, additionalProperties: true }
+        leida: { type: boolean }
+        creadaEn: { type: string, format: date-time }
+    EventoWompi:
+      type: object
+      required: [event, data, environment, signature, timestamp]
+      properties:
+        event: { type: string, example: transaction.updated }
+        data:
+          type: object
+          properties:
+            transaction:
+              type: object
+              properties:
+                id: { type: string }
+                reference: { type: string }
+                status: { type: string, enum: [PENDING, APPROVED, DECLINED, VOIDED, ERROR] }
+                amount_in_cents: { type: integer }
+                status_message: { type: [string, 'null'] }
+        environment: { type: string, enum: [test, prod] }
+        signature:
+          type: object
+          properties:
+            properties: { type: array, items: { type: string } }
+            checksum: { type: string }
+        timestamp: { type: integer }
+        sent_at: { type: string, format: date-time }

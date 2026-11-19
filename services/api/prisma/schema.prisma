@@ -1,0 +1,242 @@
+// Esquema de la base `recargamio` (sección 5 del plan, Figura 5 del documento maestro).
+// Los viajes no se guardan aquí: los entrega el recaudo simulado.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id               String    @id @default(uuid())
+  nombre           String
+  correo           String    @unique
+  hashContrasena   String    @map("hash_contrasena")
+  intentosFallidos Int       @default(0) @map("intentos_fallidos")
+  bloqueadoHasta   DateTime? @map("bloqueado_hasta")
+  creadoEn         DateTime  @default(now()) @map("creado_en")
+  eliminadoEn      DateTime? @map("eliminado_en")
+
+  autorizaciones AutorizacionDatos[]
+  tarjetas       Tarjeta[]
+  recargas       Recarga[]
+  sesiones       Sesion[]
+  dispositivos   Dispositivo[]
+  notificaciones Notificacion[]
+  auditoria      Auditoria[]
+  pqrs           Pqr[]
+  recuperaciones TokenRecuperacion[]
+
+  @@map("usuario")
+}
+
+/// Enlace de recuperación de contraseña (HU-06, CA-5): un solo uso, vence a los 30 minutos.
+/// Se guarda solo el HMAC del token, nunca el token.
+model TokenRecuperacion {
+  id        String    @id @default(uuid())
+  usuarioId String    @map("usuario_id")
+  hashToken String    @unique @map("hash_token")
+  creadoEn  DateTime  @default(now()) @map("creado_en")
+  expiraEn  DateTime  @map("expira_en")
+  usadoEn   DateTime? @map("usado_en")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@map("token_recuperacion")
+}
+
+/// Autorización de tratamiento de datos (Ley 1581 de 2012). Nunca se borra.
+model AutorizacionDatos {
+  id              String   @id @default(uuid())
+  usuarioId       String   @map("usuario_id")
+  versionPolitica String   @map("version_politica")
+  aceptadoEn      DateTime @default(now()) @map("aceptado_en")
+  ip              String?
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId])
+  @@map("autorizacion_datos")
+}
+
+/// Sesión con token de renovación rotativo (se guarda solo su HMAC). El token de acceso lleva el id de la sesión.
+model Sesion {
+  id         String    @id @default(uuid())
+  usuarioId  String    @map("usuario_id")
+  hashToken  String    @unique @map("hash_token")
+  creadaEn   DateTime  @default(now()) @map("creada_en")
+  expiraEn   DateTime  @map("expira_en")
+  revocadaEn DateTime? @map("revocada_en")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@map("sesion")
+}
+
+/// Tarjeta MIO. El número se guarda cifrado (AES-256-GCM) y con HMAC para unicidad (ADR 0009).
+model Tarjeta {
+  id            String   @id @default(uuid())
+  usuarioId     String   @map("usuario_id")
+  numeroCifrado String   @map("numero_cifrado")
+  numeroHmac    String   @map("numero_hmac")
+  ultimos4      String   @map("ultimos_4")
+  alias         String
+  activa        Boolean  @default(true)
+  creadaEn      DateTime @default(now()) @map("creada_en")
+
+  alerta   Alerta?
+  recargas Recarga[]
+  usuario  Usuario   @relation(fields: [usuarioId], references: [id])
+
+  @@unique([usuarioId, numeroHmac])
+  @@index([usuarioId, activa])
+  @@map("tarjeta")
+}
+
+/// Alerta de saldo bajo: umbral entre $3.500 y $50.000, máximo un aviso cada 12 h.
+model Alerta {
+  id                 String    @id @default(uuid())
+  tarjetaId          String    @unique @map("tarjeta_id")
+  umbral             Int
+  activa             Boolean   @default(true)
+  ultimaNotificacion DateTime? @map("ultima_notificacion")
+
+  tarjeta Tarjeta @relation(fields: [tarjetaId], references: [id], onDelete: Cascade)
+
+  @@map("alerta")
+}
+
+enum EstadoRecarga {
+  PENDIENTE
+  APROBADA
+  ACREDITADA
+  RECHAZADA
+  ERROR
+  FALLA_ACREDITACION
+}
+
+enum MedioPago {
+  NEQUI
+  PSE
+  BANCOLOMBIA_TRANSFER
+}
+
+/// Recarga. Métrica clave: acreditadaEn − iniciadaEn ≤ 180 s. Nunca se borra.
+model Recarga {
+  id                 String        @id @default(uuid())
+  referencia         String        @unique // RM-000123: la que ve el usuario
+  /// Referencia enviada a la pasarela: RM-000123-K7Q2. El sufijo evita choques en Wompi si se reinicia la base (ADR 0013)
+  referenciaPasarela String        @unique @map("referencia_pasarela")
+  idTransaccion      String?       @unique @map("id_transaccion") // id de la transacción en la pasarela
+  urlPago            String?       @map("url_pago") // PSE y Bancolombia: página del banco donde se autoriza
+  motivo             String? // motivo de rechazo o error que informa la pasarela
+  saldoResultante    Int?          @map("saldo_resultante") // nuevo saldo informado por el recaudo al acreditar
+  usuarioId          String        @map("usuario_id")
+  tarjetaId          String?       @map("tarjeta_id") // nulo cuando es a un tercero
+  numeroDestino      String        @map("numero_destino") // tarjeta MIO destino (no es dato bancario)
+  monto              Int // en pesos
+  medioPago          MedioPago     @map("medio_pago")
+  estado             EstadoRecarga @default(PENDIENTE)
+  iniciadaEn         DateTime      @default(now()) @map("iniciada_en")
+  confirmadaEn       DateTime?     @map("confirmada_en") // la pasarela aprobó
+  acreditadaEn       DateTime?     @map("acreditada_en") // el recaudo confirmó
+
+  transacciones TransaccionPasarela[]
+  usuario       Usuario               @relation(fields: [usuarioId], references: [id])
+  tarjeta       Tarjeta?              @relation(fields: [tarjetaId], references: [id])
+
+  @@index([estado, iniciadaEn])
+  @@index([usuarioId, iniciadaEn])
+  @@index([tarjetaId])
+  @@map("recarga")
+}
+
+/// Evento recibido de Wompi. La restricción única evita procesar dos veces el mismo estado.
+model TransaccionPasarela {
+  id             String   @id @default(uuid())
+  recargaId      String   @map("recarga_id")
+  idExterno      String   @map("id_externo")
+  estado         String
+  checksumEvento String?  @map("checksum_evento")
+  cuerpo         Json
+  recibidaEn     DateTime @default(now()) @map("recibida_en")
+
+  recarga Recarga @relation(fields: [recargaId], references: [id])
+
+  @@unique([idExterno, estado])
+  @@index([recargaId])
+  @@map("transaccion_pasarela")
+}
+
+model Dispositivo {
+  id         String   @id @default(uuid())
+  usuarioId  String   @map("usuario_id")
+  tokenFcm   String   @unique @map("token_fcm")
+  plataforma String
+  creadoEn   DateTime @default(now()) @map("creado_en")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@map("dispositivo")
+}
+
+enum TipoNotificacion {
+  SALDO_BAJO
+  RECARGA_EXITOSA
+}
+
+/// Avisos al usuario (HU-05, ADR 0014). Se guardan siempre, haya o no FCM, y la app los muestra en su bandeja.
+model Notificacion {
+  id          String           @id @default(uuid())
+  usuarioId   String           @map("usuario_id")
+  tipo        TipoNotificacion
+  titulo      String
+  cuerpo      String
+  /// Identificadores para abrir la pantalla correcta (tarjetaId o recargaId). Nunca números de tarjeta.
+  datos       Json             @default("{}")
+  enviadaPush Boolean          @default(false) @map("enviada_push")
+  leida       Boolean          @default(false)
+  creadaEn    DateTime         @default(now()) @map("creada_en")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, creadaEn])
+  @@map("notificacion")
+}
+
+/// Auditoría de ingresos, recargas y cambios de tarjetas (RF-12). Nunca se borra.
+model Auditoria {
+  id        String   @id @default(uuid())
+  usuarioId String?  @map("usuario_id")
+  accion    String
+  detalle   Json?
+  fecha     DateTime @default(now())
+
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId, fecha])
+  @@map("auditoria")
+}
+
+/// Petición, queja o reclamo (Ley 1480 de 2011).
+model Pqr {
+  id        String   @id @default(uuid())
+  usuarioId String   @map("usuario_id")
+  tipo      String
+  mensaje   String
+  radicado  String   @unique
+  estado    String   @default("RADICADA")
+  creadaEn  DateTime @default(now()) @map("creada_en")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId])
+  @@map("pqr")
+}
